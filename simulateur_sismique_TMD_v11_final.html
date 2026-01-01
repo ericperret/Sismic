@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Simulateur Sismique v11 - Villa avec TMD + LRB Bilinéaire</title>
+    <style>
+        body { font-family: 'Courier New', monospace; background: #0d1117; color: #c9d1d9; margin: 0; padding: 20px; }
+        .container { max-width: 1600px; margin: auto; background: #161b22; padding: 30px; border-radius: 8px; border: 1px solid #30363d; }
+        h1 { color: #58a6ff; text-align: center; margin-bottom: 5px; font-size: 1.8em; }
+        .subtitle { text-align: center; color: #8b949e; margin-bottom: 20px; font-size: 0.85em; }
+        h2 { color: #79c0ff; border-bottom: 2px solid #30363d; padding-bottom: 8px; margin-top: 20px; font-size: 1.2em; }
+        h3 { color: #58a6ff; margin-top: 12px; font-size: 0.95em; }
+        .section { margin: 15px 0; padding: 15px; background: #0d1117; border-left: 4px solid #58a6ff; border-radius: 4px; }
+        .subsection { margin: 10px 0; padding: 12px; background: #161b22; border: 1px solid #30363d; border-radius: 4px; }
+        label { display: block; margin: 8px 0 4px 0; color: #8b949e; font-size: 0.8em; font-weight: bold; }
+        input, select { width: 100%; padding: 6px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; font-family: monospace; box-sizing: border-box; font-size: 0.85em; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+        .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; }
+        .grid-5 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 10px; }
+        
+        button { padding: 10px 18px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; margin-right: 8px; transition: 0.2s; text-transform: uppercase; font-size: 0.8em; }
+        .btn-run { background: #238636; color: white; }
+        .btn-run:hover { background: #2ea043; }
+        .btn-csv { background: #1f6feb; color: white; }
+        .btn-csv:hover { background: #388bfd; }
+        .btn-tune { background: #da3633; color: white; }
+        .btn-tune:hover { background: #f85149; }
+        .btn-hyst { background: #f0883e; color: white; }
+        .btn-hyst:hover { background: #db6d28; }
+
+        canvas { width: 100%; height: 300px; background: #0d1117; border: 1px solid #30363d; margin-top: 8px; }
+        
+        .info-box { background: #1c2128; padding: 8px; border-radius: 3px; border-left: 3px solid #58a6ff; margin: 8px 0; font-size: 0.75em; }
+        .warning-box { background: #3d1f1a; padding: 8px; border-radius: 3px; border-left: 3px solid #f85149; margin: 8px 0; font-size: 0.75em; color: #ff7b72; }
+        .success-box { background: #0f3e1a; padding: 8px; border-radius: 3px; border-left: 3px solid #3fb950; margin: 8px 0; font-size: 0.75em; color: #3fb950; }
+        .new-box { background: #1a3a2a; padding: 8px; border-radius: 3px; border-left: 3px solid #f0883e; margin: 8px 0; font-size: 0.75em; color: #f0883e; }
+        
+        .verdict-box { margin-top: 15px; padding: 12px; border-radius: 4px; text-align: center; font-weight: bold; font-size: 1.1em; }
+        .pass { background: #0f3e1a; border: 1px solid #3fb950; color: #3fb950; }
+        .fail { background: #3d1f1a; border: 1px solid #f85149; color: #f85149; }
+        
+        .stat-display { text-align: center; padding: 8px; background: #0d1117; border-radius: 4px; border: 1px solid #30363d; }
+        .stat-value { font-size: 1.3em; font-weight: bold; color: #58a6ff; }
+        .stat-label { font-size: 0.75em; color: #8b949e; margin-top: 4px; }
+        .stat-display.highlight { border-color: #f0883e; }
+        .stat-display.highlight .stat-value { color: #f0883e; }
+        
+        .toggle-container { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+        .toggle { position: relative; width: 50px; height: 26px; }
+        .toggle input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #30363d; transition: .3s; border-radius: 26px; }
+        .toggle-slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: #c9d1d9; transition: .3s; border-radius: 50%; }
+        input:checked + .toggle-slider { background-color: #f0883e; }
+        input:checked + .toggle-slider:before { transform: translateX(24px); }
+        .toggle-label { color: #c9d1d9; font-size: 0.85em; }
+        
+        .version-badge { display: inline-block; background: #f0883e; color: #000; padding: 2px 8px; border-radius: 10px; font-size: 0.7em; font-weight: bold; margin-left: 10px; }
+        
+        .lang-switch { position: absolute; top: 20px; right: 30px; display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        .lang-switch span { font-size: 1.5em; opacity: 0.5; transition: 0.2s; }
+        .lang-switch span.active { opacity: 1; }
+        .lang-switch span:hover { opacity: 0.8; }
+        
+        .header-container { position: relative; }
+        
+        @media (max-width: 1200px) { .grid-3, .grid-2, .grid-4, .grid-5 { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-container">
+        <div class="lang-switch" onclick="toggleLang()">
+            <span id="flag-fr" class="active">🇫🇷</span>
+            <span id="flag-en">🇬🇧</span>
+        </div>
+        <h1>🏗️ <span data-i18n="title">Simulateur Sismique : Villa + TMD</span> <span class="version-badge">v11 LRB Bilinéaire</span></h1>
+        <p class="subtitle" data-i18n="subtitle">Isolation LRB Hystérétique • TMD Liquide • TMD Pendulaire • Newmark-β</p>
+    </div>
+
+    <!-- SÉISME -->
+    <div class="section">
+        <h2>📉 <span data-i18n="seismic_title">Paramètres Sismiques</span></h2>
+        
+        <div class="subsection">
+            <label data-i18n="reference_quake">Séisme de référence (historique)</label>
+            <select id="quake_preset" onchange="applyQuakePreset()">
+                <option value="custom" data-i18n="custom_quake">-- Personnalisé --</option>
+                <optgroup label="🇯🇵 Japon">
+                    <option value="kobe1995">Kobe 1995 (M6.9, 0.8g, 1.0-2.0 Hz)</option>
+                    <option value="tohoku2011">Tōhoku 2011 (M9.1, 2.7g, 0.1-0.5 Hz)</option>
+                    <option value="niigata2004">Niigata 2004 (M6.6, 1.3g, 1.0-2.0 Hz)</option>
+                    <option value="kumamoto2016">Kumamoto 2016 (M7.0, 1.2g, 1.0-3.0 Hz)</option>
+                </optgroup>
+                <optgroup label="🇺🇸 États-Unis">
+                    <option value="northridge1994">Northridge 1994 (M6.7, 1.8g, 1.0-4.0 Hz)</option>
+                    <option value="lomaprieta1989">Loma Prieta 1989 (M6.9, 0.6g, 0.5-2.0 Hz)</option>
+                    <option value="sanfernando1971">San Fernando 1971 (M6.6, 1.2g, 2.0-5.0 Hz)</option>
+                    <option value="alaska1964">Alaska 1964 (M9.2, 0.2g, 0.1-0.3 Hz)</option>
+                </optgroup>
+                <optgroup label="🇳🇿 Nouvelle-Zélande">
+                    <option value="christchurch2011">Christchurch 2011 (M6.2, 2.2g, 2.0-4.0 Hz)</option>
+                    <option value="kaikoura2016">Kaikōura 2016 (M7.8, 1.3g, 0.5-2.0 Hz)</option>
+                </optgroup>
+                <optgroup label="🇹🇼 Taïwan">
+                    <option value="chichi1999">Chi-Chi 1999 (M7.6, 1.0g, 0.3-1.5 Hz)</option>
+                </optgroup>
+                <optgroup label="🇨🇱 Chili">
+                    <option value="chile2010">Maule 2010 (M8.8, 0.8g, 0.2-0.5 Hz)</option>
+                    <option value="chile1960">Valdivia 1960 (M9.5, 0.5g, 0.1-0.3 Hz)</option>
+                </optgroup>
+                <optgroup label="🇮🇹 Italie">
+                    <option value="laquila2009">L'Aquila 2009 (M6.3, 0.7g, 1.0-3.0 Hz)</option>
+                    <option value="amatrice2016">Amatrice 2016 (M6.2, 0.9g, 2.0-5.0 Hz)</option>
+                </optgroup>
+                <optgroup label="🇹🇷 Turquie">
+                    <option value="izmit1999">Izmit 1999 (M7.6, 0.4g, 0.5-2.0 Hz)</option>
+                    <option value="turkey2023">Kahramanmaraş 2023 (M7.8, 1.5g, 0.5-1.5 Hz)</option>
+                </optgroup>
+                <optgroup label="🇭🇹 Haïti">
+                    <option value="haiti2010">Haïti 2010 (M7.0, 0.5g, 1.0-3.0 Hz)</option>
+                </optgroup>
+                <optgroup label="🇳🇵 Népal">
+                    <option value="nepal2015">Népal 2015 (M7.8, 0.2g, 0.2-0.5 Hz)</option>
+                </optgroup>
+                <optgroup label="🇲🇽 Mexique">
+                    <option value="mexico1985">Mexico 1985 (M8.0, 0.2g, 0.3-0.7 Hz)</option>
+                    <option value="mexico2017">Puebla 2017 (M7.1, 0.4g, 1.0-2.0 Hz)</option>
+                </optgroup>
+            </select>
+            <div class="info-box" id="quake_info" data-i18n="quake_info">Sélectionnez un séisme historique ou paramétrez manuellement</div>
+        </div>
+        
+        <div class="grid-3">
+            <div>
+                <label data-i18n="magnitude">Magnitude Richter</label>
+                <input type="number" id="magnitude" value="7.0" step="0.1" onchange="updatePGA()" oninput="updatePGA()">
+            </div>
+            <div>
+                <label data-i18n="distance">Distance épicentre (km)</label>
+                <input type="number" id="distance" value="10" step="0.5" onchange="updatePGA()" oninput="updatePGA()">
+            </div>
+            <div>
+                <label data-i18n="pga">PGA (g) [Auto]</label>
+                <input type="number" id="pga_g" value="" step="0.01" readonly style="background: #1c2128;">
+            </div>
+        </div>
+        <div class="grid-3" style="margin-top: 10px;">
+            <div>
+                <label data-i18n="duration">Durée séisme (s)</label>
+                <input type="number" id="duration" value="20" min="5" max="120">
+            </div>
+            <div>
+                <label data-i18n="dom_freq">Fréquence dominante (Hz)</label>
+                <input type="number" id="seismFreq" value="2.0" step="0.1" min="0.1" max="10">
+            </div>
+            <div>
+                <label data-i18n="soil_type">Type de sol</label>
+                <select id="soil_type" onchange="updatePGA()">
+                    <option value="A" data-i18n="soil_rock">A - Rocher (Vs > 800 m/s)</option>
+                    <option value="B" data-i18n="soil_stiff">B - Sol ferme (360-800 m/s)</option>
+                    <option value="C" selected data-i18n="soil_medium">C - Sol moyen (180-360 m/s)</option>
+                    <option value="D" data-i18n="soil_soft">D - Sol mou (< 180 m/s)</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- ISOLATION LRB -->
+    <div class="section">
+        <h2>🛡️ <span data-i18n="isolation_title">Isolation Sismique LRB</span> <span class="version-badge" data-i18n="bilinear">BILINÉAIRE</span></h2>
+        
+        <div class="toggle-container">
+            <label class="toggle">
+                <input type="checkbox" id="bilinear_mode" checked onchange="updateFoundation()">
+                <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label" data-i18n="bilinear_toggle">Modèle bilinéaire hystérétique</span>
+        </div>
+        
+        <div class="subsection">
+            <h3 data-i18n="lrb_bearings">Amortisseurs LRB-II (×16)</h3>
+            <label data-i18n="model">Modèle</label>
+            <select id="lrb_model" onchange="updateFoundation()">
+                <option value="D400">D400 - Ø400mm</option>
+                <option value="D500">D500 - Ø500mm</option>
+                <option value="D600" selected>D600 - Ø600mm</option>
+                <option value="D700">D700 - Ø700mm</option>
+                <option value="D800">D800 - Ø800mm</option>
+                <option value="D900">D900 - Ø900mm</option>
+                <option value="D1000">D1000 - Ø1000mm</option>
+            </select>
+        </div>
+        
+        <div class="subsection" id="bilinear_params">
+            <h3>📐 <span data-i18n="bilinear_params">Paramètres Bilinéaires (16 LRB)</span></h3>
+            <div class="grid-4">
+                <div class="stat-display highlight">
+                    <div class="stat-value" id="ki_val">-</div>
+                    <div class="stat-label">Ki (MN/m)</div>
+                </div>
+                <div class="stat-display highlight">
+                    <div class="stat-value" id="kd_val">-</div>
+                    <div class="stat-label">Kd (MN/m)</div>
+                </div>
+                <div class="stat-display highlight">
+                    <div class="stat-value" id="qd_val">-</div>
+                    <div class="stat-label">Qd (kN)</div>
+                </div>
+                <div class="stat-display highlight">
+                    <div class="stat-value" id="dy_val">-</div>
+                    <div class="stat-label">Dy (mm)</div>
+                </div>
+            </div>
+            <div class="new-box" style="margin-top: 10px;" data-i18n="bilinear_formula">
+                <strong>Bilinéaire:</strong> F = Ki×u si |u| ≤ Dy, sinon F = Fy + Kd×(u-Dy) avec hystérésis
+            </div>
+        </div>
+        
+        <div class="grid-4" style="margin-top: 12px;">
+            <div class="stat-display">
+                <div class="stat-value" id="keff_val">-</div>
+                <div class="stat-label">Keff @100mm (MN/m)</div>
+            </div>
+            <div class="stat-display">
+                <div class="stat-value" id="beta_val">-</div>
+                <div class="stat-label">βeff @100mm (%)</div>
+            </div>
+            <div class="stat-display">
+                <div class="stat-value" id="cost_found">-</div>
+                <div class="stat-label" data-i18n="cost">Coût (€)</div>
+            </div>
+            <div class="stat-display">
+                <div class="stat-value" id="disp_max_lrb">-</div>
+                <div class="stat-label" data-i18n="design_disp">Dépl. design (mm)</div>
+            </div>
+        </div>
+        
+        <button class="btn-hyst" onclick="drawHysteresis()" style="margin-top: 15px;">📊 <span data-i18n="view_hysteresis">Voir Hystérésis</span></button>
+        <canvas id="canvasHysteresis" style="height: 280px; display: none;"></canvas>
+    </div>
+
+    <!-- STRUCTURE -->
+    <div class="section">
+        <h2>🏠 <span data-i18n="structure_title">Structure (M1: Radier + Villa)</span></h2>
+        <div class="grid-3">
+            <div>
+                <label data-i18n="mass_m1">Masse M1 (tonnes)</label>
+                <input type="number" id="m1" value="150" min="50">
+            </div>
+            <div>
+                <label data-i18n="wall_stiffness">Rigidité murs (MN/m)</label>
+                <input type="number" id="k_walls" value="50" min="10">
+            </div>
+            <div>
+                <label data-i18n="struct_damping">Amortissement struct. (%)</label>
+                <input type="number" id="damp_struct" value="5" min="1" max="15" step="0.5">
+            </div>
+        </div>
+    </div>
+
+    <!-- TMD PISCINE -->
+    <div class="section">
+        <h2>🌊 <span data-i18n="tld_title">TMD Liquide : Piscine</span></h2>
+        <label style="display: inline-flex; align-items: center; margin-bottom: 10px;">
+            <input type="checkbox" id="pool_active" checked style="width: auto; margin-right: 8px;" onchange="computePoolParameters()">
+            <span data-i18n="pool_active">TMD Piscine actif</span>
+        </label>
+        <div id="pool_params">
+            <div class="grid-3">
+                <div>
+                    <label data-i18n="pool_length">Longueur (m)</label>
+                    <input type="number" id="pool_length" value="4" step="0.5" min="2" oninput="computePoolParameters()">
+                </div>
+                <div>
+                    <label data-i18n="pool_depth">Profondeur (m)</label>
+                    <input type="number" id="pool_depth" value="1.2" step="0.1" min="0.5" max="2" oninput="computePoolParameters()">
+                </div>
+                <div>
+                    <label data-i18n="mass_m2">Masse M2 (t) [Auto]</label>
+                    <input type="number" id="m2" value="" readonly style="background: #1c2128;">
+                </div>
+            </div>
+            <div class="grid-3" style="margin-top: 10px;">
+                <div class="stat-display">
+                    <div class="stat-value" id="freq_sloshing">-</div>
+                    <div class="stat-label" data-i18n="sloshing_freq">Fréq. sloshing (Hz)</div>
+                </div>
+                <div class="stat-display">
+                    <div class="stat-value" id="k2_calc">-</div>
+                    <div class="stat-label">K2 (kN/m)</div>
+                </div>
+                <div class="stat-display">
+                    <div class="stat-value" id="damp_pool">-</div>
+                    <div class="stat-label" data-i18n="damping">Amort. (%)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TMD PENDULE -->
+    <div class="section">
+        <h2>⚖️ <span data-i18n="tmd_title">TMD Pendulaire : Big-Bag</span></h2>
+        <div class="grid-3">
+            <div>
+                <label data-i18n="mass_m3">Masse M3 (tonnes)</label>
+                <input type="number" id="m3" value="1.5" step="0.1" min="0.5" max="3" oninput="computePendulumParameters()">
+            </div>
+            <div>
+                <label data-i18n="cable_length">Longueur câble (m)</label>
+                <input type="number" id="cable_length" value="0.25" step="0.05" min="0.10" max="0.60" oninput="computePendulumParameters()">
+            </div>
+            <div>
+                <label data-i18n="damping">Amortissement (%)</label>
+                <input type="number" id="damp_pendulum" value="5" step="0.5" min="1" max="15">
+            </div>
+        </div>
+        <div class="grid-2" style="margin-top: 10px;">
+            <div class="stat-display">
+                <div class="stat-value" id="freq_pendulum">-</div>
+                <div class="stat-label" data-i18n="frequency">Fréquence (Hz)</div>
+            </div>
+            <div class="stat-display">
+                <div class="stat-value" id="k3_calc">-</div>
+                <div class="stat-label">K3 (kN/m)</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SIMULATION -->
+    <div style="text-align: center; margin: 25px 0;">
+        <button class="btn-tune" onclick="autoTune()">🎯 <span data-i18n="auto_tune">Auto-Accordage</span></button>
+        <button class="btn-run" onclick="runSimulation()">▶️ <span data-i18n="run_sim">SIMULATION</span></button>
+        <button class="btn-csv" onclick="exportCSV()">💾 CSV</button>
+    </div>
+
+    <!-- RÉSULTATS -->
+    <div class="section">
+        <h2>📊 <span data-i18n="results_title">Résultats</span></h2>
+        <h3 data-i18n="seismic_signal">Signal Sismique</h3>
+        <canvas id="canvasSeism" style="height: 150px;"></canvas>
+        <h3 style="margin-top: 15px;" data-i18n="displacements">Déplacements</h3>
+        <canvas id="canvasResponse"></canvas>
+        <div class="grid-4" style="margin-top: 15px;">
+            <div class="stat-display">
+                <div class="stat-value" id="res-m1" style="color: #58a6ff;">-</div>
+                <div class="stat-label" data-i18n="max_villa">Max Villa (cm)</div>
+            </div>
+            <div class="stat-display">
+                <div class="stat-value" id="res-m2" style="color: #d29922;">-</div>
+                <div class="stat-label" data-i18n="max_pool">Max Piscine (cm)</div>
+            </div>
+            <div class="stat-display">
+                <div class="stat-value" id="res-m3" style="color: #f85149;">-</div>
+                <div class="stat-label" data-i18n="max_bag">Max Big-Bag (cm)</div>
+            </div>
+            <div class="stat-display highlight">
+                <div class="stat-value" id="res-energy">-</div>
+                <div class="stat-label" data-i18n="lrb_energy">Énergie LRB (kJ)</div>
+            </div>
+        </div>
+        <div id="verdictBlock"></div>
+    </div>
+
+    <div style="color: #484f58; font-size: 0.65em; margin-top: 20px; text-align: center;">
+        v11 • Newmark-β (γ=0.5, β=0.25) • LRB Bilinéaire • 3-DDL couplés
+    </div>
+</div>
+
+<script>
+// ============================================================================
+// TRADUCTIONS
+// ============================================================================
+const i18n = {
+    fr: {
+        title: "Simulateur Sismique : Villa + TMD",
+        subtitle: "Isolation LRB Hystérétique • TMD Liquide • TMD Pendulaire • Newmark-β",
+        seismic_title: "Paramètres Sismiques",
+        reference_quake: "Séisme de référence (historique)",
+        custom_quake: "-- Personnalisé --",
+        quake_info: "Sélectionnez un séisme historique ou paramétrez manuellement",
+        magnitude: "Magnitude Richter",
+        distance: "Distance épicentre (km)",
+        pga: "PGA (g) [Auto]",
+        duration: "Durée séisme (s)",
+        dom_freq: "Fréquence dominante (Hz)",
+        soil_type: "Type de sol",
+        soil_rock: "A - Rocher (Vs > 800 m/s)",
+        soil_stiff: "B - Sol ferme (360-800 m/s)",
+        soil_medium: "C - Sol moyen (180-360 m/s)",
+        soil_soft: "D - Sol mou (< 180 m/s)",
+        isolation_title: "Isolation Sismique LRB",
+        bilinear: "BILINÉAIRE",
+        bilinear_toggle: "Modèle bilinéaire hystérétique",
+        lrb_bearings: "Amortisseurs LRB-II (×16)",
+        model: "Modèle",
+        bilinear_params: "Paramètres Bilinéaires (16 LRB)",
+        bilinear_formula: "<strong>Bilinéaire:</strong> F = Ki×u si |u| ≤ Dy, sinon F = Fy + Kd×(u-Dy) avec hystérésis",
+        cost: "Coût (€)",
+        design_disp: "Dépl. design (mm)",
+        view_hysteresis: "Voir Hystérésis",
+        structure_title: "Structure (M1: Radier + Villa)",
+        mass_m1: "Masse M1 (tonnes)",
+        wall_stiffness: "Rigidité murs (MN/m)",
+        struct_damping: "Amortissement struct. (%)",
+        tld_title: "TMD Liquide : Piscine",
+        pool_active: "TMD Piscine actif",
+        pool_length: "Longueur (m)",
+        pool_depth: "Profondeur (m)",
+        mass_m2: "Masse M2 (t) [Auto]",
+        sloshing_freq: "Fréq. sloshing (Hz)",
+        damping: "Amort. (%)",
+        tmd_title: "TMD Pendulaire : Big-Bag",
+        mass_m3: "Masse M3 (tonnes)",
+        cable_length: "Longueur câble (m)",
+        frequency: "Fréquence (Hz)",
+        auto_tune: "Auto-Accordage",
+        run_sim: "SIMULATION",
+        results_title: "Résultats",
+        seismic_signal: "Signal Sismique",
+        displacements: "Déplacements",
+        max_villa: "Max Villa (cm)",
+        max_pool: "Max Piscine (cm)",
+        max_bag: "Max Big-Bag (cm)",
+        lrb_energy: "Énergie LRB (kJ)",
+        verdict_pass: "OBJECTIF ATTEINT",
+        verdict_minor: "DOMMAGES MINEURS",
+        verdict_fail: "DOMMAGES IMPORTANTS",
+        model_bilinear: "Modèle LRB bilinéaire",
+        model_linear: "Modèle LRB linéaire",
+        energy: "Énergie",
+        disp: "Déplacement",
+        auto_tune_msg: "Auto-accordage:\n• f_structure ≈ {f} Hz\n• Câble optimal: {L_opt} cm\n• Câble appliqué: {L_app} cm"
+    },
+    en: {
+        title: "Seismic Simulator: Villa + TMD",
+        subtitle: "Hysteretic LRB Isolation • Liquid TMD • Pendulum TMD • Newmark-β",
+        seismic_title: "Seismic Parameters",
+        reference_quake: "Reference earthquake (historical)",
+        custom_quake: "-- Custom --",
+        quake_info: "Select a historical earthquake or set parameters manually",
+        magnitude: "Richter Magnitude",
+        distance: "Epicenter distance (km)",
+        pga: "PGA (g) [Auto]",
+        duration: "Earthquake duration (s)",
+        dom_freq: "Dominant frequency (Hz)",
+        soil_type: "Soil type",
+        soil_rock: "A - Rock (Vs > 800 m/s)",
+        soil_stiff: "B - Stiff soil (360-800 m/s)",
+        soil_medium: "C - Medium soil (180-360 m/s)",
+        soil_soft: "D - Soft soil (< 180 m/s)",
+        isolation_title: "LRB Seismic Isolation",
+        bilinear: "BILINEAR",
+        bilinear_toggle: "Bilinear hysteretic model",
+        lrb_bearings: "LRB-II Bearings (×16)",
+        model: "Model",
+        bilinear_params: "Bilinear Parameters (16 LRB)",
+        bilinear_formula: "<strong>Bilinear:</strong> F = Ki×u if |u| ≤ Dy, else F = Fy + Kd×(u-Dy) with hysteresis",
+        cost: "Cost (€)",
+        design_disp: "Design disp. (mm)",
+        view_hysteresis: "View Hysteresis",
+        structure_title: "Structure (M1: Foundation + Villa)",
+        mass_m1: "Mass M1 (tonnes)",
+        wall_stiffness: "Wall stiffness (MN/m)",
+        struct_damping: "Structural damping (%)",
+        tld_title: "Liquid TMD: Pool",
+        pool_active: "Pool TMD active",
+        pool_length: "Length (m)",
+        pool_depth: "Depth (m)",
+        mass_m2: "Mass M2 (t) [Auto]",
+        sloshing_freq: "Sloshing freq. (Hz)",
+        damping: "Damping (%)",
+        tmd_title: "Pendulum TMD: Big-Bag",
+        mass_m3: "Mass M3 (tonnes)",
+        cable_length: "Cable length (m)",
+        frequency: "Frequency (Hz)",
+        auto_tune: "Auto-Tune",
+        run_sim: "SIMULATE",
+        results_title: "Results",
+        seismic_signal: "Seismic Signal",
+        displacements: "Displacements",
+        max_villa: "Max Villa (cm)",
+        max_pool: "Max Pool (cm)",
+        max_bag: "Max Big-Bag (cm)",
+        lrb_energy: "LRB Energy (kJ)",
+        verdict_pass: "OBJECTIVE MET",
+        verdict_minor: "MINOR DAMAGE",
+        verdict_fail: "SIGNIFICANT DAMAGE",
+        model_bilinear: "Bilinear LRB model",
+        model_linear: "Linear LRB model",
+        energy: "Energy",
+        disp: "Displacement",
+        auto_tune_msg: "Auto-tuning:\n• f_structure ≈ {f} Hz\n• Optimal cable: {L_opt} cm\n• Applied cable: {L_app} cm"
+    }
+};
+
+let currentLang = 'fr';
+
+function toggleLang() {
+    currentLang = (currentLang === 'fr') ? 'en' : 'fr';
+    document.getElementById('flag-fr').classList.toggle('active', currentLang === 'fr');
+    document.getElementById('flag-en').classList.toggle('active', currentLang === 'en');
+    applyTranslations();
+}
+
+function applyTranslations() {
+    const t = i18n[currentLang];
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (t[key]) {
+            if (el.tagName === 'INPUT' || el.tagName === 'OPTION') {
+                // Ne pas traduire les valeurs des inputs
+            } else {
+                el.innerHTML = t[key];
+            }
+        }
+    });
+}
+
+// ============================================================================
+// BASE DE DONNÉES SÉISMES HISTORIQUES
+// ============================================================================
+const QUAKE_DB = {
+    // Format: { mag, pga (g), freq (Hz), duration (s), distance (km), info }
+    // PGA = valeur max enregistrée, freq = fréquence dominante typique
+    
+    // Japon
+    kobe1995:        { mag: 6.9, pga: 0.82, freq: 1.5,  dur: 20,  dist: 1,   info: "Kobe 1995 - 6 434 morts, faille Nojima" },
+    tohoku2011:      { mag: 9.1, pga: 2.70, freq: 0.3,  dur: 180, dist: 130, info: "Tōhoku 2011 - M9.1, tsunami, 18 500+ morts" },
+    niigata2004:     { mag: 6.6, pga: 1.30, freq: 1.5,  dur: 30,  dist: 10,  info: "Niigata 2004 - Glissements de terrain majeurs" },
+    kumamoto2016:    { mag: 7.0, pga: 1.20, freq: 2.0,  dur: 20,  dist: 5,   info: "Kumamoto 2016 - Double séisme" },
+    
+    // USA
+    northridge1994:  { mag: 6.7, pga: 1.82, freq: 2.5,  dur: 15,  dist: 1,   info: "Northridge 1994 - PGA record USA, $44Mrd" },
+    lomaprieta1989:  { mag: 6.9, pga: 0.64, freq: 1.0,  dur: 15,  dist: 15,  info: "Loma Prieta 1989 - World Series, 63 morts" },
+    sanfernando1971: { mag: 6.6, pga: 1.20, freq: 3.0,  dur: 12,  dist: 8,   info: "San Fernando 1971 - Révolution code parasismique" },
+    alaska1964:      { mag: 9.2, pga: 0.18, freq: 0.2,  dur: 240, dist: 100, info: "Alaska 1964 - M9.2, 2e plus fort jamais mesuré" },
+    
+    // Nouvelle-Zélande
+    christchurch2011:{ mag: 6.2, pga: 2.20, freq: 3.0,  dur: 10,  dist: 5,   info: "Christchurch 2011 - PGA 2.2g vertical!" },
+    kaikoura2016:    { mag: 7.8, pga: 1.30, freq: 1.0,  dur: 60,  dist: 20,  info: "Kaikōura 2016 - Rupture multi-failles" },
+    
+    // Taïwan
+    chichi1999:      { mag: 7.6, pga: 1.01, freq: 0.8,  dur: 40,  dist: 5,   info: "Chi-Chi 1999 - 2 415 morts, faille Chelungpu" },
+    
+    // Chili
+    chile2010:       { mag: 8.8, pga: 0.78, freq: 0.3,  dur: 150, dist: 100, info: "Maule 2010 - M8.8, tsunami, 525 morts" },
+    chile1960:       { mag: 9.5, pga: 0.50, freq: 0.2,  dur: 300, dist: 150, info: "Valdivia 1960 - Plus fort séisme jamais enregistré" },
+    
+    // Italie
+    laquila2009:     { mag: 6.3, pga: 0.66, freq: 2.0,  dur: 20,  dist: 3,   info: "L'Aquila 2009 - 309 morts, procès scientifiques" },
+    amatrice2016:    { mag: 6.2, pga: 0.90, freq: 3.5,  dur: 15,  dist: 2,   info: "Amatrice 2016 - 299 morts, patrimoine détruit" },
+    
+    // Turquie
+    izmit1999:       { mag: 7.6, pga: 0.41, freq: 1.0,  dur: 45,  dist: 10,  info: "Izmit 1999 - 17 000+ morts, faille Nord-Anatolienne" },
+    turkey2023:      { mag: 7.8, pga: 1.50, freq: 1.0,  dur: 90,  dist: 5,   info: "Kahramanmaraş 2023 - Double séisme, 50 000+ morts" },
+    
+    // Autres
+    haiti2010:       { mag: 7.0, pga: 0.50, freq: 2.0,  dur: 35,  dist: 15,  info: "Haïti 2010 - 230 000+ morts, catastrophe humanitaire" },
+    nepal2015:       { mag: 7.8, pga: 0.18, freq: 0.3,  dur: 50,  dist: 80,  info: "Népal 2015 - 9 000 morts, Everest avalanches" },
+    mexico1985:      { mag: 8.0, pga: 0.17, freq: 0.5,  dur: 180, dist: 350, info: "Mexico 1985 - Amplification bassin lacustre" },
+    mexico2017:      { mag: 7.1, pga: 0.40, freq: 1.5,  dur: 20,  dist: 55,  info: "Puebla 2017 - 370 morts, anniversaire 1985" }
+};
+
+function applyQuakePreset() {
+    const sel = document.getElementById('quake_preset').value;
+    if (sel === 'custom') {
+        document.getElementById('quake_info').textContent = i18n[currentLang].quake_info;
+        return;
+    }
+    
+    const q = QUAKE_DB[sel];
+    if (!q) return;
+    
+    document.getElementById('magnitude').value = q.mag.toFixed(1);
+    document.getElementById('distance').value = q.dist.toFixed(0);
+    document.getElementById('seismFreq').value = q.freq.toFixed(1);
+    document.getElementById('duration').value = q.dur;
+    document.getElementById('quake_info').innerHTML = `<strong>${q.info}</strong><br>PGA enregistré: ${q.pga}g | Fréq: ${q.freq} Hz`;
+    
+    updatePGA();
+}
+
+// ============================================================================
+// BASE DE DONNÉES LRB
+// ============================================================================
+const LRB_DB = {
+    D400:  { Ki: 6.8,  Kd: 0.27, Qd: 10.4, Dy: 1.6,  Tr: 74,  price: 497  },
+    D500:  { Ki: 8.4,  Kd: 0.40, Qd: 12.7, Dy: 1.6,  Tr: 93,  price: 1584 },
+    D600:  { Ki: 10.2, Kd: 0.63, Qd: 15.8, Dy: 1.65, Tr: 111, price: 2671 },
+    D700:  { Ki: 11.9, Kd: 0.90, Qd: 18.9, Dy: 1.72, Tr: 129, price: 3758 },
+    D800:  { Ki: 13.6, Kd: 1.06, Qd: 20.8, Dy: 1.66, Tr: 147, price: 4845 },
+    D900:  { Ki: 15.3, Kd: 1.41, Qd: 23.7, Dy: 1.71, Tr: 166, price: 5932 },
+    D1000: { Ki: 17.0, Kd: 1.82, Qd: 26.9, Dy: 1.77, Tr: 184, price: 7019 }
+};
+
+// ============================================================================
+// VARIABLES GLOBALES
+// ============================================================================
+let groundAccel = [], timeData = [];
+let dispM1 = [], dispM2 = [], dispM3 = [];
+let simRunning = false, totalEnergy = 0;
+let LRB = { Ki: 0, Kd: 0, Qd: 0, Dy: 0, Fy: 0 };
+let M1 = 0, M2 = 0, M3 = 0, K2 = 0, K3 = 0, C2 = 0, C3 = 0;
+
+// ============================================================================
+// PGA AVEC EFFET DE SITE
+// ============================================================================
+function updatePGA() {
+    const M = parseFloat(document.getElementById('magnitude').value);
+    const R = Math.max(parseFloat(document.getElementById('distance').value), 1);
+    const soil = document.getElementById('soil_type').value;
+    
+    // Coefficients d'amplification de site (Eurocode 8 simplifié)
+    const siteFactors = { A: 1.0, B: 1.2, C: 1.35, D: 1.5 };
+    const S = siteFactors[soil] || 1.35;
+    
+    // GMPE simplifiée
+    let PGA = 0.4 * Math.pow(2, M - 7.0) * Math.sqrt(10 / R) * S;
+    PGA = Math.min(PGA, 3.0);
+    document.getElementById('pga_g').value = PGA.toFixed(2);
+}
+
+// ============================================================================
+// FONDATION LRB
+// ============================================================================
+function updateFoundation() {
+    const model = document.getElementById('lrb_model').value;
+    const lrb = LRB_DB[model];
+    const n = 16;
+    const bilinear = document.getElementById('bilinear_mode').checked;
+    
+    LRB.Ki = lrb.Ki * n * 1e6;
+    LRB.Kd = lrb.Kd * n * 1e6;
+    LRB.Qd = lrb.Qd * n * 1e3;
+    LRB.Dy = lrb.Dy * 1e-3;
+    LRB.Fy = LRB.Ki * LRB.Dy;
+    LRB.Tr = lrb.Tr * 1e-3;
+    
+    document.getElementById('bilinear_params').style.display = bilinear ? 'block' : 'none';
+    document.getElementById('ki_val').textContent = (LRB.Ki / 1e6).toFixed(1);
+    document.getElementById('kd_val').textContent = (LRB.Kd / 1e6).toFixed(2);
+    document.getElementById('qd_val').textContent = (LRB.Qd / 1e3).toFixed(0);
+    document.getElementById('dy_val').textContent = (LRB.Dy * 1000).toFixed(2);
+    
+    const D_ref = 0.1;
+    const Keff = (LRB.Qd + LRB.Kd * D_ref) / D_ref;
+    const EDC = 4 * LRB.Qd * (D_ref - LRB.Dy);
+    const betaEff = EDC / (2 * Math.PI * Keff * D_ref * D_ref);
+    
+    document.getElementById('keff_val').textContent = (Keff / 1e6).toFixed(2);
+    document.getElementById('beta_val').textContent = (betaEff * 100).toFixed(1);
+    document.getElementById('cost_found').textContent = (n * lrb.price).toLocaleString('fr-FR');
+    document.getElementById('disp_max_lrb').textContent = (lrb.Tr).toFixed(0);
+}
+
+// ============================================================================
+// HYSTÉRÉSIS
+// ============================================================================
+function drawHysteresis() {
+    const canvas = document.getElementById('canvasHysteresis');
+    canvas.style.display = 'block';
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width = canvas.parentElement.offsetWidth;
+    const h = canvas.height = 280;
+    
+    ctx.fillStyle = "#0d1117";
+    ctx.fillRect(0, 0, w, h);
+    
+    const D_max = LRB.Tr;
+    const F_max = LRB.Fy + LRB.Kd * (D_max - LRB.Dy);
+    
+    const margin = 50;
+    const scaleX = (w - 2*margin) / (2 * D_max * 1000);
+    const scaleY = (h - 2*margin) / (2 * F_max / 1000);
+    const cx = w/2, cy = h/2;
+    
+    // Grille
+    ctx.strokeStyle = "#21262d";
+    for (let i = -4; i <= 4; i++) {
+        ctx.beginPath();
+        ctx.moveTo(cx + i * D_max * 250 * scaleX, margin);
+        ctx.lineTo(cx + i * D_max * 250 * scaleX, h - margin);
+        ctx.stroke();
+    }
+    
+    // Axes
+    ctx.strokeStyle = "#484f58";
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(margin, cy); ctx.lineTo(w-margin, cy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx, margin); ctx.lineTo(cx, h-margin); ctx.stroke();
+    
+    // Squelette
+    ctx.strokeStyle = "#f0883e";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + LRB.Dy * 1000 * scaleX, cy - (LRB.Fy / 1000) * scaleY);
+    ctx.lineTo(cx + D_max * 1000 * scaleX, cy - (F_max / 1000) * scaleY);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx - LRB.Dy * 1000 * scaleX, cy + (LRB.Fy / 1000) * scaleY);
+    ctx.lineTo(cx - D_max * 1000 * scaleX, cy + (F_max / 1000) * scaleY);
+    ctx.stroke();
+    
+    // Boucle
+    ctx.strokeStyle = "#58a6ff";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + LRB.Dy * 1000 * scaleX, cy - (LRB.Fy / 1000) * scaleY);
+    ctx.lineTo(cx + D_max * 1000 * scaleX, cy - (F_max / 1000) * scaleY);
+    const F_unload = F_max - LRB.Ki * 2 * LRB.Dy;
+    ctx.lineTo(cx + (D_max - 2*LRB.Dy) * 1000 * scaleX, cy - (F_unload / 1000) * scaleY);
+    ctx.lineTo(cx - LRB.Dy * 1000 * scaleX, cy + (LRB.Fy / 1000) * scaleY);
+    ctx.lineTo(cx - D_max * 1000 * scaleX, cy + (F_max / 1000) * scaleY);
+    ctx.lineTo(cx - (D_max - 2*LRB.Dy) * 1000 * scaleX, cy + (F_unload / 1000) * scaleY);
+    ctx.lineTo(cx + LRB.Dy * 1000 * scaleX, cy - (LRB.Fy / 1000) * scaleY);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.fillStyle = "rgba(88, 166, 255, 0.15)";
+    ctx.fill();
+    
+    // Point Dy
+    ctx.fillStyle = "#3fb950";
+    ctx.beginPath();
+    ctx.arc(cx + LRB.Dy * 1000 * scaleX, cy - (LRB.Fy / 1000) * scaleY, 5, 0, 2*Math.PI);
+    ctx.fill();
+    
+    // Labels
+    ctx.fillStyle = "#8b949e";
+    ctx.font = "11px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(currentLang === 'fr' ? "Déplacement (mm)" : "Displacement (mm)", w/2, h - 8);
+    ctx.fillText(currentLang === 'fr' ? "Force (kN)" : "Force (kN)", 25, 15);
+    ctx.fillStyle = "#3fb950";
+    ctx.fillText("Dy", cx + LRB.Dy * 1000 * scaleX + 15, cy - (LRB.Fy / 1000) * scaleY);
+    
+    const EDC = 4 * LRB.Qd * (D_max - LRB.Dy);
+    ctx.fillStyle = "#f0883e";
+    ctx.textAlign = "left";
+    ctx.fillText(`EDC = ${(EDC/1000).toFixed(1)} kJ/cycle`, 60, 25);
+}
+
+// ============================================================================
+// PISCINE
+// ============================================================================
+function computePoolParameters() {
+    const active = document.getElementById('pool_active').checked;
+    document.getElementById('pool_params').style.opacity = active ? '1' : '0.4';
+    
+    if (!active) {
+        M2 = 0; K2 = 0; C2 = 0;
+        document.getElementById('m2').value = '0';
+        document.getElementById('freq_sloshing').textContent = 'OFF';
+        document.getElementById('k2_calc').textContent = 'OFF';
+        document.getElementById('damp_pool').textContent = 'OFF';
+        return;
+    }
+    
+    const L = parseFloat(document.getElementById('pool_length').value);
+    const h = parseFloat(document.getElementById('pool_depth').value);
+    M2 = L * 3 * h * 1000;
+    document.getElementById('m2').value = (M2/1000).toFixed(1);
+    
+    const g = 9.81, k = Math.PI / L;
+    const freq = (1/(2*Math.PI)) * Math.sqrt(g * k * Math.tanh(k * h));
+    K2 = M2 * Math.pow(2 * Math.PI * freq, 2);
+    C2 = 0.05;
+    
+    document.getElementById('freq_sloshing').textContent = freq.toFixed(3);
+    document.getElementById('k2_calc').textContent = (K2/1000).toFixed(1);
+    document.getElementById('damp_pool').textContent = (C2*100).toFixed(0);
+}
+
+// ============================================================================
+// PENDULE
+// ============================================================================
+function computePendulumParameters() {
+    M3 = parseFloat(document.getElementById('m3').value) * 1000;
+    const L = parseFloat(document.getElementById('cable_length').value);
+    const freq = (1/(2*Math.PI)) * Math.sqrt(9.81 / L);
+    K3 = M3 * Math.pow(2 * Math.PI * freq, 2);
+    C3 = parseFloat(document.getElementById('damp_pendulum').value) / 100;
+    
+    document.getElementById('freq_pendulum').textContent = freq.toFixed(3);
+    document.getElementById('k3_calc').textContent = (K3/1000).toFixed(1);
+}
+
+// ============================================================================
+// AUTO-ACCORDAGE
+// ============================================================================
+function autoTune() {
+    updateFoundation();
+    M1 = parseFloat(document.getElementById('m1').value) * 1000;
+    M3 = parseFloat(document.getElementById('m3').value) * 1000;
+    
+    const omega_struct = Math.sqrt(LRB.Kd / M1);
+    const f_struct = omega_struct / (2 * Math.PI);
+    const mu = M3 / M1;
+    const f_opt = f_struct / (1 + mu);
+    const L_opt = 9.81 / (4 * Math.PI * Math.PI * f_opt * f_opt);
+    const L_clamped = Math.max(0.1, Math.min(0.6, L_opt));
+    
+    document.getElementById('cable_length').value = L_clamped.toFixed(2);
+    computePendulumParameters();
+    
+    const t = i18n[currentLang];
+    alert(t.auto_tune_msg.replace('{f}', f_struct.toFixed(2)).replace('{L_opt}', (L_opt*100).toFixed(0)).replace('{L_app}', (L_clamped*100).toFixed(0)));
+}
+
+// ============================================================================
+// SIMULATION
+// ============================================================================
+function runSimulation() {
+    updateFoundation();
+    computePoolParameters();
+    computePendulumParameters();
+    
+    M1 = parseFloat(document.getElementById('m1').value) * 1000;
+    const bilinear = document.getElementById('bilinear_mode').checked;
+    const poolActive = document.getElementById('pool_active').checked;
+    const zeta_struct = parseFloat(document.getElementById('damp_struct').value) / 100;
+    
+    const duration = parseFloat(document.getElementById('duration').value);
+    const pga = parseFloat(document.getElementById('pga_g').value) * 9.81;
+    const dt = 0.002;
+    const steps = Math.ceil(duration / dt);
+    
+    generateSeismicSignal(pga, duration, dt, steps);
+    
+    const M2_eff = poolActive ? M2 : 1;
+    const K2_eff = poolActive ? K2 : 1;
+    const C2_coef = poolActive ? C2 : 0;
+    
+    const omega1 = Math.sqrt(LRB.Kd / M1);
+    const omega2 = Math.sqrt(K2_eff / M2_eff);
+    const omega3 = Math.sqrt(K3 / M3);
+    
+    const c1 = 2 * zeta_struct * omega1 * M1;
+    const c2 = 2 * C2_coef * omega2 * M2_eff;
+    const c3 = 2 * C3 * omega3 * M3;
+    
+    const M_diag = [M1, M2_eff, M3];
+    const C_mat = [[c1+c2+c3, -c2, -c3], [-c2, c2||0.01, 0], [-c3, 0, c3]];
+    
+    const beta = 0.25, gamma = 0.5;
+    const a0 = 1/(beta*dt*dt), a1 = gamma/(beta*dt), a2 = 1/(beta*dt);
+    const a3 = 1/(2*beta)-1, a4 = gamma/beta-1, a5 = dt/2*(gamma/beta-2);
+    const a6 = dt*(1-gamma), a7 = gamma*dt;
+    
+    let u = [0,0,0], v = [0,0,0], a_vec = [0,0,0];
+    let u_lrb_prev = 0, F_lrb_prev = 0, branch = 1;
+    
+    dispM1 = []; dispM2 = []; dispM3 = [];
+    timeData = [];
+    totalEnergy = 0;
+    
+    for (let i = 0; i < steps; i++) {
+        const t = i * dt;
+        const ag = groundAccel[i] || 0;
+        
+        let F_lrb;
+        if (bilinear) {
+            const u_lrb = u[0];
+            const du = u_lrb - u_lrb_prev;
+            if (du * branch < 0 && Math.abs(du) > 1e-10) branch = -branch;
+            
+            const F_envelope = (Math.abs(u_lrb) <= LRB.Dy) 
+                ? LRB.Ki * u_lrb 
+                : Math.sign(u_lrb) * (LRB.Fy + LRB.Kd * (Math.abs(u_lrb) - LRB.Dy));
+            
+            const F_elastic = F_lrb_prev + LRB.Ki * du;
+            
+            if (branch > 0) {
+                F_lrb = (u_lrb >= 0) ? Math.min(F_elastic, F_envelope) : Math.max(F_elastic, F_envelope);
+            } else {
+                F_lrb = (u_lrb >= 0) ? Math.max(F_elastic, F_envelope) : Math.min(F_elastic, F_envelope);
+            }
+            
+            if (u_lrb > 0) {
+                F_lrb = Math.min(F_lrb, F_envelope);
+                F_lrb = Math.max(F_lrb, -LRB.Fy - LRB.Kd * (Math.abs(u_lrb) + LRB.Dy));
+            } else {
+                F_lrb = Math.max(F_lrb, F_envelope);
+                F_lrb = Math.min(F_lrb, LRB.Fy + LRB.Kd * (Math.abs(u_lrb) + LRB.Dy));
+            }
+            
+            if (Math.abs(u_lrb) > LRB.Dy) totalEnergy += Math.abs(F_lrb * du) * 0.5;
+            u_lrb_prev = u_lrb;
+            F_lrb_prev = F_lrb;
+        } else {
+            const Keff = (LRB.Qd + LRB.Kd * 0.1) / 0.1;
+            F_lrb = Keff * u[0];
+        }
+        
+        const F_ext = [-M1*ag - F_lrb, -M2_eff*ag, -M3*ag];
+        const K_lrb_tan = (Math.abs(u[0]) <= LRB.Dy) ? LRB.Ki : LRB.Kd;
+        const K_mat = [[K_lrb_tan + K2_eff + K3, -K2_eff, -K3], [-K2_eff, K2_eff||1, 0], [-K3, 0, K3]];
+        const F_correction = F_lrb - K_lrb_tan * u[0];
+        
+        const K_eff = [];
+        for (let ii = 0; ii < 3; ii++) {
+            K_eff[ii] = [];
+            for (let jj = 0; jj < 3; jj++) {
+                const m = (ii === jj) ? a0 * M_diag[ii] : 0;
+                K_eff[ii][jj] = K_mat[ii][jj] + m + a1 * C_mat[ii][jj];
+            }
+        }
+        
+        const F_eff = [];
+        for (let ii = 0; ii < 3; ii++) {
+            F_eff[ii] = F_ext[ii] - (ii === 0 ? F_correction : 0);
+            F_eff[ii] += M_diag[ii] * (a0*u[ii] + a2*v[ii] + a3*a_vec[ii]);
+            for (let jj = 0; jj < 3; jj++) F_eff[ii] += C_mat[ii][jj] * (a1*u[jj] + a4*v[jj] + a5*a_vec[jj]);
+        }
+        
+        const u_new = solve3x3(K_eff, F_eff);
+        const a_new = [], v_new = [];
+        for (let ii = 0; ii < 3; ii++) {
+            a_new[ii] = a0*(u_new[ii] - u[ii]) - a2*v[ii] - a3*a_vec[ii];
+            v_new[ii] = v[ii] + a6*a_vec[ii] + a7*a_new[ii];
+        }
+        
+        u = u_new; v = v_new; a_vec = a_new;
+        
+        if (i % 5 === 0) {
+            dispM1.push(u[0] * 100);
+            dispM2.push(poolActive ? u[1] * 100 : 0);
+            dispM3.push(u[2] * 100);
+            timeData.push(t);
+        }
+    }
+    
+    drawResults(dt * 5, poolActive);
+    simRunning = true;
+}
+
+function solve3x3(A, b) {
+    const M = A.map((row, i) => [...row, b[i]]);
+    for (let i = 0; i < 3; i++) {
+        let maxRow = i;
+        for (let k = i+1; k < 3; k++) if (Math.abs(M[k][i]) > Math.abs(M[maxRow][i])) maxRow = k;
+        [M[i], M[maxRow]] = [M[maxRow], M[i]];
+        for (let k = i+1; k < 3; k++) {
+            const f = M[k][i] / (M[i][i] || 1e-20);
+            for (let j = i; j <= 3; j++) M[k][j] -= f * M[i][j];
+        }
+    }
+    const x = [0, 0, 0];
+    for (let i = 2; i >= 0; i--) {
+        x[i] = M[i][3];
+        for (let j = i+1; j < 3; j++) x[i] -= M[i][j] * x[j];
+        x[i] /= (M[i][i] || 1e-20);
+    }
+    return x;
+}
+
+function generateSeismicSignal(pga, duration, dt, steps) {
+    groundAccel = [];
+    const f_dom = parseFloat(document.getElementById('seismFreq').value);
+    
+    for (let i = 0; i < steps; i++) {
+        const t = i * dt;
+        let env;
+        if (t < 1) env = t;
+        else if (t < duration * 0.6) env = 1;
+        else env = Math.exp(-2 * (t - duration * 0.6) / duration);
+        
+        const s1 = Math.sin(2*Math.PI*f_dom*0.7*t);
+        const s2 = Math.sin(2*Math.PI*f_dom*t + 0.5);
+        const s3 = Math.sin(2*Math.PI*f_dom*1.4*t + 1.0);
+        const noise = 0.2 * (Math.random() - 0.5);
+        
+        groundAccel.push(pga * env * (0.35*s1 + 0.4*s2 + 0.15*s3 + noise));
+    }
+}
+
+// ============================================================================
+// RÉSULTATS
+// ============================================================================
+function drawResults(dt, poolActive) {
+    const t = i18n[currentLang];
+    
+    // Signal sismique
+    const canvasSeism = document.getElementById('canvasSeism');
+    const ctxS = canvasSeism.getContext('2d');
+    const wS = canvasSeism.width = canvasSeism.parentElement.offsetWidth;
+    const hS = 150;
+    canvasSeism.height = hS;
+    
+    ctxS.fillStyle = "#0d1117";
+    ctxS.fillRect(0, 0, wS, hS);
+    
+    const agData = groundAccel.filter((_, i) => i % 5 === 0);
+    const maxAg = Math.max(...agData.map(Math.abs)) * 1.1;
+    
+    ctxS.strokeStyle = "#58a6ff";
+    ctxS.lineWidth = 1;
+    ctxS.beginPath();
+    for (let i = 0; i < agData.length; i++) {
+        const x = i * wS / agData.length;
+        const y = hS/2 - agData[i] / maxAg * (hS/2 - 10);
+        if (i === 0) ctxS.moveTo(x, y); else ctxS.lineTo(x, y);
+    }
+    ctxS.stroke();
+    
+    ctxS.fillStyle = "#8b949e";
+    ctxS.font = "10px monospace";
+    ctxS.fillText(`${currentLang === 'fr' ? 'Accél. sol' : 'Ground acc.'} (max: ${(maxAg/9.81).toFixed(2)}g)`, 10, 15);
+    
+    // Réponse
+    const canvas = document.getElementById('canvasResponse');
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width = canvas.parentElement.offsetWidth;
+    const h = canvas.height = 300;
+    
+    ctx.fillStyle = "#0d1117";
+    ctx.fillRect(0, 0, w, h);
+    
+    const all = [...dispM1, ...dispM3];
+    if (poolActive) all.push(...dispM2);
+    const maxDisp = Math.max(...all.map(Math.abs)) * 1.2 || 1;
+    
+    const yCenter = h/2;
+    const yScale = (h/2 - 20) / maxDisp;
+    const xScale = w / dispM1.length;
+    
+    ctx.strokeStyle = "#30363d";
+    ctx.beginPath(); ctx.moveTo(0, yCenter); ctx.lineTo(w, yCenter); ctx.stroke();
+    
+    ctx.strokeStyle = "#3fb950";
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(0, yCenter - 2*yScale); ctx.lineTo(w, yCenter - 2*yScale);
+    ctx.moveTo(0, yCenter + 2*yScale); ctx.lineTo(w, yCenter + 2*yScale);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    
+    function drawCurve(data, color) {
+        ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.beginPath();
+        for (let i = 0; i < data.length; i++) {
+            const x = i * xScale, y = yCenter - data[i] * yScale;
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+    }
+    
+    drawCurve(dispM3, "#f85149");
+    if (poolActive) drawCurve(dispM2, "#d29922");
+    drawCurve(dispM1, "#58a6ff");
+    
+    ctx.fillStyle = "#8b949e";
+    ctx.font = "10px monospace";
+    const legend = currentLang === 'fr' 
+        ? "Bleu: Villa | Rouge: Pendule | Vert: ±2cm"
+        : "Blue: Villa | Red: Pendulum | Green: ±2cm";
+    ctx.fillText(legend, 10, 15);
+    ctx.fillText(`±${maxDisp.toFixed(1)} cm`, w - 70, 15);
+    
+    // Stats
+    const max1 = Math.max(...dispM1.map(Math.abs));
+    const max2 = Math.max(...dispM2.map(Math.abs));
+    const max3 = Math.max(...dispM3.map(Math.abs));
+    
+    document.getElementById('res-m1').textContent = max1.toFixed(2);
+    document.getElementById('res-m2').textContent = poolActive ? max2.toFixed(2) : 'OFF';
+    document.getElementById('res-m3').textContent = max3.toFixed(2);
+    document.getElementById('res-energy').textContent = (totalEnergy / 1000).toFixed(1);
+    
+    // Verdict
+    const box = document.getElementById('verdictBlock');
+    const bilinear = document.getElementById('bilinear_mode').checked;
+    const modelInfo = bilinear 
+        ? `<br><span style="font-size:0.65em; color:#f0883e;">${t.model_bilinear} • ${t.energy}: ${(totalEnergy/1000).toFixed(1)} kJ</span>`
+        : `<br><span style="font-size:0.65em;">${t.model_linear}</span>`;
+    
+    if (max1 < 2) {
+        box.innerHTML = `<div class="verdict-box pass">✅ ${t.verdict_pass}<br>${t.disp} ${max1.toFixed(2)} cm < 2 cm${modelInfo}</div>`;
+    } else if (max1 < 10) {
+        box.innerHTML = `<div class="verdict-box" style="background:#3d2e1a; border-color:#d29922; color:#d29922;">⚠️ ${t.verdict_minor}<br>${t.disp} ${max1.toFixed(2)} cm${modelInfo}</div>`;
+    } else {
+        box.innerHTML = `<div class="verdict-box fail">❌ ${t.verdict_fail}<br>${t.disp} ${max1.toFixed(2)} cm${modelInfo}</div>`;
+    }
+}
+
+// ============================================================================
+// EXPORT CSV
+// ============================================================================
+function exportCSV() {
+    if (!simRunning) { alert(currentLang === 'fr' ? "Lancez d'abord la simulation" : "Run simulation first"); return; }
+    
+    let csv = "Time(s),Villa(cm),Pool(cm),Pendulum(cm)\n";
+    for (let i = 0; i < timeData.length; i++) {
+        csv += `${timeData[i].toFixed(3)},${dispM1[i].toFixed(4)},${dispM2[i].toFixed(4)},${dispM3[i].toFixed(4)}\n`;
+    }
+    
+    const blob = new Blob([csv], {type: 'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'simulation_tmd_v11.csv';
+    a.click();
+}
+
+// ============================================================================
+// INIT
+// ============================================================================
+window.addEventListener('DOMContentLoaded', () => {
+    updatePGA();
+    updateFoundation();
+    computePoolParameters();
+    computePendulumParameters();
+    applyTranslations();
+});
+</script>
+</body>
+</html>
