@@ -1,27 +1,63 @@
-[![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
 # Sismic
-simulateur sismique
 
-# Simulateur Sismique
+[![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
 
-Ce projet est un outil interactif pour simuler les vibrations sismiques sur des structures, avec un amortisseur de masse accordé (Tuned Mass Damper - TMD). Tout est implémenté en une seule page HTML et JavaScript, sans dépendances externes ni serveur. Idéal pour tester des scénarios d'ingénierie sismique, comme les fréquences de résonance, l'amortissement, les masses et les accélérations.
+Simulateur sismique interactif pour structures avec isolation LRB et amortisseurs de masse accordés (TMD).
 
-## Comment tester
-C'est simple et autonome :
-1. Cliquez sur le fichier `simulateur_sismique_TMD_v11_final.html` dans le dépôt.
-2. Téléchargez-le ou ouvrez-le directement via "Raw" (clic droit > Enregistrer sous).
-3. Ouvrez le fichier dans un navigateur web (Chrome ou Firefox recommandé pour une meilleure performance).
-4. Autorisez l'accès si nécessaire (bien que ce simulateur n'utilise pas de micro ou de caméra).
-5. Utilisez les sliders et inputs pour ajuster les paramètres : masses, rigidités, damping, accélération sismique, etc. Les résultats (déplacements, graphiques) s'affichent en temps réel.
+## Fonctionnalités
 
-Pas d'installation requise – ça tourne entièrement côté client.
+### Modélisation
 
-## Fonctionnalités principales
-- Simulation de réponses sismiques pour bâtiments ou structures.
-- Calculs en temps réel : fréquences, amortissement, graphs de déplacements/accélérations.
-- Interface intuitive avec canvas pour visualisations.
+- **3 degrés de liberté couplés** : Structure (M1), TMD liquide (M2), TMD pendulaire (M3)
+- **Isolation LRB bilinéaire** : Modèle hystérétique réaliste avec paramètres Ki, Kd, Qd, Dy
+- **Intégration Newmark-β** : γ=0.5, β=0.25 (accélération moyenne)
 
-Si vous voulez contribuer ou modifier, fork le repo et éditez le HTML/JS directement.
+### Séismes
+
+Base de données de 20 séismes historiques avec paramètres réels :
+- Japon : Kobe 1995, Tōhoku 2011, Kumamoto 2016
+- USA : Northridge 1994, Loma Prieta 1989, Alaska 1964
+- Autres : Christchurch 2011, Chi-Chi 1999, Turquie 2023...
+
+Paramètres ajustables : magnitude, distance épicentrale, fréquence dominante, type de sol (A/B/C/D selon Eurocode 8).
+
+### Dispositifs de protection
+
+| Dispositif | Description |
+|------------|-------------|
+| **LRB** | 16 isolateurs plomb-caoutchouc (Ø400 à Ø1000mm), courbe hystérésis visualisable |
+| **TMD Piscine** | Amortisseur liquide par sloshing, fréquence calculée automatiquement |
+| **TMD Pendule** | Big-bag suspendu, longueur de câble ajustable (10-60 cm) |
+
+### Outils
+
+- **Auto-accordage** : Calcul automatique de la longueur de câble optimale
+- **Export CSV** : Historique temporel des déplacements
+- **Visualisation hystérésis** : Boucle force-déplacement du système LRB
+- **Interface bilingue** : Français / Anglais
+
+## Utilisation
+
+1. Ouvrir `simulateur_sismique_TMD_v11_final.html` dans un navigateur
+2. Sélectionner un séisme de référence ou paramétrer manuellement
+3. Configurer les dispositifs (LRB, piscine, pendule)
+4. Cliquer sur **SIMULATION**
+5. Analyser les résultats (déplacements max, énergie dissipée, verdict)
+
+## Critères de performance
+
+| Déplacement structure | Verdict |
+|-----------------------|---------|
+| < 2 cm | ✅ Objectif atteint |
+| 2-10 cm | ⚠️ Dommages mineurs |
+| > 10 cm | ❌ Dommages importants |
+
+## Technique
+
+- HTML/JS pur, aucune dépendance
+- Résolution système 3×3 par élimination de Gauss avec pivot
+- Pas de temps : 2 ms
 
 ## Licence
-Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0) – Utilisation libre avec attribution, mais pas d'usage commercial. Voir le fichier LICENSE pour détails.
+
+CC BY-NC 4.0 — Usage non-commercial, attribution requise.
