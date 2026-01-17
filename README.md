@@ -1,63 +1,49 @@
-# Sismic
+🏗️ Sisimic
 
-[![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](#)
+[![Pure HTML/JS](https://img.shields.io/badge/Pure-HTML%2FJS-blue.svg)](#)
+[![Engineering](https://img.shields.io/badge/Domain-Civil%20Engineering-orange.svg)](#)
 
-Simulateur sismique interactif pour structures avec isolation LRB et amortisseurs de masse accordés (TMD).
+**Seismic building response simulator** with tuned mass damper (TMD) and base isolation systems.
 
-## Fonctionnalités
+![Screenshot](screenshot.png)
 
-### Modélisation
+## 🚀 Features
 
-- **3 degrés de liberté couplés** : Structure (M1), TMD liquide (M2), TMD pendulaire (M3)
-- **Isolation LRB bilinéaire** : Modèle hystérétique réaliste avec paramètres Ki, Kd, Qd, Dy
-- **Intégration Newmark-β** : γ=0.5, β=0.25 (accélération moyenne)
+- **Multi-story Building Model** — Realistic mass-spring-damper system
+- **Tuned Mass Damper (TMD)** — Passive vibration control simulation
+- **Base Isolation (LRB)** — Lead rubber bearing simulation
+- **Real-time Visualization** — Animated building response
+- **Earthquake Input** — Various ground motion profiles
+- **Parameter Adjustment** — Tune TMD frequency, damping, mass ratio
 
-### Séismes
+## 🛠️ Tech Stack
 
-Base de données de 20 séismes historiques avec paramètres réels :
-- Japon : Kobe 1995, Tōhoku 2011, Kumamoto 2016
-- USA : Northridge 1994, Loma Prieta 1989, Alaska 1964
-- Autres : Christchurch 2011, Chi-Chi 1999, Turquie 2023...
+- Pure HTML/CSS/JavaScript
+- Canvas-based animation
+- Numerical integration (Newmark-β)
+- No external dependencies
 
-Paramètres ajustables : magnitude, distance épicentrale, fréquence dominante, type de sol (A/B/C/D selon Eurocode 8).
+## 📖 Usage
 
-### Dispositifs de protection
+1. Open \`index.html\` in your browser
+2. Configure building parameters (floors, stiffness, damping)
+3. Enable/disable TMD or base isolation
+4. Select earthquake profile
+5. Click **Start** to run simulation
 
-| Dispositif | Description |
-|------------|-------------|
-| **LRB** | 16 isolateurs plomb-caoutchouc (Ø400 à Ø1000mm), courbe hystérésis visualisable |
-| **TMD Piscine** | Amortisseur liquide par sloshing, fréquence calculée automatiquement |
-| **TMD Pendule** | Big-bag suspendu, longueur de câble ajustable (10-60 cm) |
+## 🎓 Educational Purpose
 
-### Outils
+Learn structural dynamics concepts:
+- Natural frequency and mode shapes
+- Resonance and amplification
+- Passive vs. active vibration control
+- Seismic isolation principles
 
-- **Auto-accordage** : Calcul automatique de la longueur de câble optimale
-- **Export CSV** : Historique temporel des déplacements
-- **Visualisation hystérésis** : Boucle force-déplacement du système LRB
-- **Interface bilingue** : Français / Anglais
+## 📄 License
 
-## Utilisation
+MIT
 
-1. Ouvrir `simulateur_sismique_TMD_v11_final.html` dans un navigateur
-2. Sélectionner un séisme de référence ou paramétrer manuellement
-3. Configurer les dispositifs (LRB, piscine, pendule)
-4. Cliquer sur **SIMULATION**
-5. Analyser les résultats (déplacements max, énergie dissipée, verdict)
+## 👤 Author
 
-## Critères de performance
-
-| Déplacement structure | Verdict |
-|-----------------------|---------|
-| < 2 cm | ✅ Objectif atteint |
-| 2-10 cm | ⚠️ Dommages mineurs |
-| > 10 cm | ❌ Dommages importants |
-
-## Technique
-
-- HTML/JS pur, aucune dépendance
-- Résolution système 3×3 par élimination de Gauss avec pivot
-- Pas de temps : 2 ms
-
-## Licence
-
-CC BY-NC 4.0 — Usage non-commercial, attribution requise.
+**Eric PERRET** — [GitHub](https://github.com/ericperret)
