@@ -6,6 +6,9 @@
 
 **Seismic building response simulator** with tuned mass damper (TMD) and base isolation systems.
 
+
+▶️ [Lancer l'application](index2.html)
+
 ![Screenshot](screenshot.png)
 
 ## 🚀 Features
@@ -45,5 +48,6 @@ Learn structural dynamics concepts:
 MIT
 
 ## 👤 Author
+
 
 **Eric PERRET** — [GitHub](https://github.com/ericperret)
