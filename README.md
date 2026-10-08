@@ -1,7 +1,7 @@
 <!--
   Nom      : README.md
   Objet    : Présentation du simulateur d'isolation sismique (dépôt GitHub)
-  Auteur   : Eric — assistance Claude (Anthropic)
+  Auteur   : Eric PERRET — assistance Claude (Anthropic)
   Date     : 2026-10-08
   Version  : 15.1
   Licence  : CC BY-NC 4.0 — usage commercial interdit sans accord écrit de l'auteur
@@ -83,7 +83,7 @@ HTML / CSS / JavaScript natif, fichier unique, sans dépendance externe. Interfa
 
 [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/deed.fr) — Attribution, pas d'utilisation commerciale.
 
-- Utilisation, copie et modification libres à des fins **non commerciales**, avec **mention de l'auteur** (Eric).
+- Utilisation, copie et modification libres à des fins **non commerciales**, avec **mention de l'auteur** (Eric PERRET).
 - Toute **utilisation commerciale est interdite sans accord écrit** de l'auteur.
 
 Voir le fichier [LICENSE](LICENSE).
