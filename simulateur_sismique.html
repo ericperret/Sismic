@@ -1,0 +1,1446 @@
+<!DOCTYPE html>
+<!--
+==============================================================================
+ Nom          : simulateur_sismique_v15.html
+ Objet        : Aide au choix de l'isolation sismique d'une maison de plain-pied
+                12 × 12 m sur fondation sandwich : courbe prix / risque par
+                type de terrain, pour 21 séismes de référence
+ Auteur       : Eric — assistance Claude (Anthropic)
+ Date         : 2026-10-08
+ Version      : 15.1
+ Dépendances  : aucune (HTML/CSS/JavaScript natif, fichier autonome)
+ Licence      : CC BY-NC 4.0 — usage commercial interdit sans accord écrit de l'auteur
+------------------------------------------------------------------------------
+ Historique
+   11    : LRB bilinéaire, 3 DDL, Newmark-β
+   12.0  : 4 DDL, LRB cinématique + Newton-Raphson, critères EN 15129 / EC8
+   13.0  : balayage automatique des appuis, verdicts piscine / big-bag,
+           torsion accidentelle, spectre EC8, carte de chaleur
+   14.0  : C10 - modèle figé : plain-pied parpaing chaîné, tôle sur charpente,
+                fondation sandwich (radier bas / appuis / radier haut) ;
+                piscine et big-bag retirés (verdict négatif v13) ;
+                pendules à friction R 3-6 m, course 40/60/80 cm ;
+                amortisseurs visqueux 0-30 % ; LRB D400-D1000 + glissants
+           C11 - courbe prix / risque, frontière des meilleurs compromis,
+                3 repères, prix modifiables sans recalcul, magnitude affichée
+           C12 - coupe et plan du sandwich, calcul parallèle sur 4 Workers
+   14.1  : historique : seuils de casse tracés sur l'accélération et cause
+           de la casse affichée (course dépassée / accélération)
+   14.2  : accélération tracée en enveloppes (sans isolation dessous,
+           sélection dessus), seuils au premier plan
+   15.0  : C13 - système de référence : 9 pendules R 4 m ±80 cm, grille 3×3,
+                amortisseurs 20 % (30 % sol mou), radier haut nervuré
+                (poutres BA 30×50 + poutrelles-hourdis 20+5, ≈ 80 t),
+                radier bas élargi + muret périphérique, butées en pneus
+                (contact de Hunt-Crossley) : énergie, effort et accélération
+                de choc ; casse 100 % seulement si les butées sont écrasées
+   15.1  : rôle des pneus rendu visible : casse sans pneus / avec pneus,
+           énergie absorbée et part de la capacité des pneus par séisme
+==============================================================================
+-->
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Isolation sismique v15</title>
+<style>
+:root {
+    --bg: #0d1117; --panel: #161b22; --panel2: #1c2128; --border: #30363d;
+    --text: #c9d1d9; --muted: #8b949e; --accent: #58a6ff; --accent2: #79c0ff;
+    --ok: #3fb950; --warn: #d29922; --bad: #f85149; --orange: #f0883e; --violet: #bc8cff; --grid: #21262d;
+    --h0: #0f3e1a; --h1: #24451c; --h2: #4a4215; --h3: #5e2f14; --h4: #6b1d1d;
+    --mono: ui-monospace, "SFMono-Regular", Consolas, "Courier New", monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+        --bg: #ffffff; --panel: #f6f8fa; --panel2: #eef1f4; --border: #d0d7de;
+        --text: #1f2328; --muted: #59636e; --accent: #0969da; --accent2: #0550ae;
+        --ok: #1a7f37; --warn: #9a6700; --bad: #cf222e; --orange: #bc4c00; --violet: #8250df; --grid: #e6e9ed;
+        --h0: #c8f0d0; --h1: #e6f2c2; --h2: #fbe9a8; --h3: #fcc9a2; --h4: #f9a9a6; color-scheme: light;
+    }
+}
+:root[data-theme="light"] {
+    --bg: #ffffff; --panel: #f6f8fa; --panel2: #eef1f4; --border: #d0d7de;
+    --text: #1f2328; --muted: #59636e; --accent: #0969da; --accent2: #0550ae;
+    --ok: #1a7f37; --warn: #9a6700; --bad: #cf222e; --orange: #bc4c00; --violet: #8250df; --grid: #e6e9ed;
+    --h0: #c8f0d0; --h1: #e6f2c2; --h2: #fbe9a8; --h3: #fcc9a2; --h4: #f9a9a6; color-scheme: light;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 var(--sans); }
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px;
+         background: var(--panel); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+header h1 { margin: 0; font-size: 1.1rem; color: var(--accent); }
+.badge { display: inline-block; background: var(--orange); color: #000; padding: 1px 8px; border-radius: 10px; font-size: .7rem; font-weight: 700; vertical-align: middle; margin-left: 6px; }
+.sub { color: var(--muted); font-size: .78rem; }
+.hdr-btns { display: flex; gap: 6px; }
+main { max-width: 1500px; margin: 0 auto; padding: 16px; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 14px; padding: 12px 14px; }
+.card h2 { margin: 0 0 8px; font-size: 1rem; color: var(--accent2); }
+.card h3 { margin: 0 0 6px; font-size: .85rem; color: var(--accent2); }
+details.card > summary { cursor: pointer; font-weight: 600; color: var(--accent2); list-style: none; display: flex; gap: 8px; align-items: center; }
+details.card > summary::-webkit-details-marker { display: none; }
+details.card > summary::after { content: "▸"; margin-left: auto; color: var(--muted); transition: transform .2s; }
+details.card[open] > summary::after { transform: rotate(90deg); }
+.hyp { display: grid; grid-template-columns: minmax(150px, max-content) 1fr; gap: 4px 16px; margin-top: 10px; font-size: .8rem; }
+.hyp dt { color: var(--muted); font-weight: 600; }
+.hyp dd { margin: 0; font-family: var(--mono); font-size: .78rem; }
+.prix { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px 12px; margin-top: 10px; }
+.prix label { display: block; font-size: .72rem; color: var(--muted); font-weight: 600; margin-bottom: 3px; }
+.prix input { width: 100%; padding: 5px 8px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; font: 13px var(--mono); }
+.prix input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.devis { font-size: .74rem; color: var(--muted); margin-top: 8px; font-family: var(--mono); }
+.run { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.prog { flex: 1; min-width: 200px; height: 10px; background: var(--panel2); border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+.prog > div { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--orange)); transition: width .2s; }
+.status { font-size: .8rem; color: var(--muted); min-width: 220px; }
+button { padding: 8px 16px; border: 0; border-radius: 6px; font: 700 .78rem var(--sans); cursor: pointer; color: #fff; background: #238636; text-transform: uppercase; letter-spacing: .03em; }
+button:hover { filter: brightness(1.15); }
+button:disabled { opacity: .45; cursor: progress; }
+.b-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); text-transform: none; padding: 5px 10px; }
+.tablewrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+th, td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: middle; }
+th { color: var(--muted); font-weight: 600; white-space: nowrap; }
+td.n, th.n { text-align: right; font-family: var(--mono); white-space: nowrap; }
+.clic { cursor: pointer; }
+tr.clic:hover td, td.clic:hover { background: var(--panel2); }
+tr.sel td { outline: 1px solid var(--accent); outline-offset: -1px; }
+.rep b { display: block; font-size: .8rem; }
+.rep span { font-family: var(--mono); font-size: .76rem; color: var(--muted); }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.tab { background: var(--panel); color: var(--text); border: 1px solid var(--border); text-transform: none; font-weight: 600; }
+.tab.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin: 10px 0; }
+.tile { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; text-align: center; }
+.tile b { display: block; font: 600 1.2rem var(--mono); color: var(--accent); }
+.tile span { display: block; font-size: .72rem; color: var(--muted); }
+.tile.hl { border-color: var(--orange); } .tile.hl b { color: var(--orange); }
+.titre-sel { font-size: 1.02rem; font-weight: 700; margin: 2px 0; }
+.ventil { font-size: .78rem; color: var(--muted); font-family: var(--mono); }
+.duo { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 14px; }
+@media (max-width: 1100px) { .duo { grid-template-columns: minmax(0, 1fr); } }
+.schema svg { width: 100%; height: auto; display: block; margin: 0 auto 8px; }
+.schema .plan svg { max-width: 400px; }
+.legende { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .74rem; color: var(--muted); margin-top: 6px; justify-content: center; }
+.legende i { display: inline-block; width: 12px; height: 12px; vertical-align: -2px; margin-right: 4px; border-radius: 2px; }
+.hm td.c { text-align: center; font-family: var(--mono); font-size: .76rem; color: var(--text); min-width: 70px; }
+.hm .h0 { background: var(--h0); } .hm .h1 { background: var(--h1); } .hm .h2 { background: var(--h2); }
+.hm .h3 { background: var(--h3); } .hm .h4 { background: var(--h4); }
+.hm th.c { text-align: center; white-space: normal; }
+.hm sup { color: var(--bad); font-weight: 700; }
+#cv_nuage { display: block; width: 100%; height: 400px; cursor: crosshair; }
+.charts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+@media (max-width: 1100px) { .charts { grid-template-columns: minmax(0, 1fr); } }
+.charts canvas { display: block; width: 100%; height: 220px; }
+.note { font-size: .78rem; color: var(--muted); padding: 6px 10px; border-left: 3px solid var(--accent); background: var(--panel2); border-radius: 4px; margin: 8px 0; }
+.vide { color: var(--muted); text-align: center; padding: 30px; }
+footer { text-align: center; color: var(--muted); font-size: .7rem; padding: 8px 0 18px; }
+</style>
+</head>
+<body>
+<header>
+    <div>
+        <h1><span data-i18n="titre">Isolation sismique : prix contre risque</span><span class="badge">v15.1</span></h1>
+        <div class="sub" data-i18n="soustitre">Maison plain-pied 12 × 12 m · fondation sandwich · 4 classes de sol · 21 séismes</div>
+    </div>
+    <div class="hdr-btns">
+        <button class="b-ghost" id="btnTheme" type="button">☀ / ☾</button>
+        <button class="b-ghost" id="btnLang" type="button">EN</button>
+    </div>
+</header>
+
+<main>
+    <details class="card">
+        <summary>📐 <span data-i18n="sec_hyp">Modèle de construction et hypothèses</span></summary>
+        <dl class="hyp" id="hyp"></dl>
+    </details>
+
+    <details class="card" open>
+        <summary>💶 <span data-i18n="sec_prix">Prix (modifiables, recalcul instantané)</span></summary>
+        <div class="prix" id="prix"></div>
+        <div class="devis" id="devis"></div>
+    </details>
+
+    <div class="card run">
+        <button id="btnRun" type="button">▶ <span data-i18n="b_run">Relancer le calcul</span></button>
+        <div class="prog"><div id="progBar"></div></div>
+        <div class="status" id="status"></div>
+    </div>
+
+    <div class="card">
+        <h2 data-i18n="sec_synth">Synthèse par type de terrain</h2>
+        <div class="tablewrap"><table id="synth"></table></div>
+    </div>
+
+    <div class="tabs" id="tabs"></div>
+    <div id="panneauSol"></div>
+</main>
+
+<footer data-i18n="pied">v15.1 · Newmark-β + Newton-Raphson · LRB / glissants / pendules à friction / amortisseurs visqueux · spectre EC8 type 1 · torsion accidentelle EC8</footer>
+
+<script id="noyau">
+var SIM = (function () {
+    'use strict';
+    var G = 9.81, PI = Math.PI;
+
+    /* LRB : valeurs PAR appareil (devis) : Ki, Kd (MN/m) ; Qd (kN) ; Tr caoutchouc (mm) ; prix (€) ; Ø (m) */
+    var LRB_DB = {
+        D400:  { Ki: 6.8,  Kd: 0.27, Qd: 10.4, Tr: 74,  prix: 497,  D: 0.40 },
+        D500:  { Ki: 8.4,  Kd: 0.40, Qd: 12.7, Tr: 93,  prix: 1584, D: 0.50 },
+        D600:  { Ki: 10.2, Kd: 0.63, Qd: 15.8, Tr: 111, prix: 2671, D: 0.60 },
+        D700:  { Ki: 11.9, Kd: 0.90, Qd: 18.9, Tr: 129, prix: 3758, D: 0.70 },
+        D800:  { Ki: 13.6, Kd: 1.06, Qd: 20.8, Tr: 147, prix: 4845, D: 0.80 },
+        D900:  { Ki: 15.3, Kd: 1.41, Qd: 23.7, Tr: 166, prix: 5932, D: 0.90 },
+        D1000: { Ki: 17.0, Kd: 1.82, Qd: 26.9, Tr: 184, prix: 7019, D: 1.00 }
+    };
+
+    /* ------------------------------------------------------------------
+       Hypothèses fixes (affichées)
+       ------------------------------------------------------------------ */
+    var HYP = {
+        dt: 0.002,
+        maison: { L: 12, B: 12, h: 2.8 },
+        /* radier haut nervuré : 6 poutres BA 30×50 sur les lignes d'appuis + poutrelles-hourdis 20+5 */
+        radierHaut: { L: 13, B: 13, poutres: 6, b: 0.30, h: 0.50, plancher: 300 },
+        radierBas: { ep: 0.30 },
+        /* butées : pneus de poids lourd sur muret périphérique (contact de Hunt-Crossley) */
+        butee: { E1: 10e3, sb: 0.15, n: 1.5, e: 0.5, v0: 1.0, vDim: 1.0, epPneu: 0.30, muret: { ep: 0.30, h: 0.8 }, kh: 2e8 },
+        reference: { R: 4, course: 0.80, g: 3, zeta: 0.20, zetaMou: 0.30 },
+        vide: 0.8,                 /* hauteur du vide technique (m) */
+        rhoBA: 2500,
+        murs: { lineaire: 78, masseSurf: 280, ep: 0.20, lgDir: 23, kw: 700e6, fvk0: 0.20e6, zeta: 0.05, aHP: 0.6 },
+        toiture: 30, Q: 150, psi2: 0.3,
+        gliss: { mu: 0.03, dy: 0.001, course: 0.60 },
+        css: { mu: 0.04, R: [3, 4, 5, 6], dy: 0.001, courses: [0.40, 0.60, 0.80] },
+        amort: { zetas: [0, 0.10, 0.20, 0.30] },
+        gammaAdm: 2.5, eAcc: 0.05,
+        seuilsS: [0.7, 1.0, 1.5, 2.5], seuilsA: [0.25, 0.5, 1.0, 2.0], tauxDS: [0.02, 0.10, 0.50, 1.0],
+        poidsS: 0.7, poidsA: 0.3,
+        grilles: [3, 4, 5], motifs: ['tous', 'perim', 'coins'],
+        ec8: { A: [1.00, 0.15, 0.4, 2.0], B: [1.20, 0.15, 0.5, 2.0], C: [1.15, 0.20, 0.6, 2.0], D: [1.35, 0.20, 0.8, 2.0] },
+        signal: { fmin: 0.2, fmax: 25, nf: 100, iter: 8, durMin: 20, durMax: 60 },
+        /* Prix par défaut (modifiables dans l'interface) */
+        prix: { gliss: 800, pend40: 2000, pend60: 2800, pend80: 3800, amort: 3000, fUnit: 100,
+                beton: 250, vide: 5000, pneu: 80, valeur: 250000 }
+    };
+
+    var SEISMES = [
+        { id: 'kobe1995', nom: 'Kobe 1995', mag: 6.9, pga: 0.82, dur: 20 },
+        { id: 'tohoku2011', nom: 'Tōhoku 2011', mag: 9.1, pga: 2.70, dur: 180 },
+        { id: 'niigata2004', nom: 'Niigata 2004', mag: 6.6, pga: 1.30, dur: 30 },
+        { id: 'kumamoto2016', nom: 'Kumamoto 2016', mag: 7.0, pga: 1.20, dur: 20 },
+        { id: 'northridge1994', nom: 'Northridge 1994', mag: 6.7, pga: 1.82, dur: 15 },
+        { id: 'lomaprieta1989', nom: 'Loma Prieta 1989', mag: 6.9, pga: 0.64, dur: 15 },
+        { id: 'sanfernando1971', nom: 'San Fernando 1971', mag: 6.6, pga: 1.20, dur: 12 },
+        { id: 'alaska1964', nom: 'Alaska 1964', mag: 9.2, pga: 0.18, dur: 240, est: true },
+        { id: 'christchurch2011', nom: 'Christchurch 2011', mag: 6.2, pga: 1.41, dur: 10 },
+        { id: 'kaikoura2016', nom: 'Kaikōura 2016', mag: 7.8, pga: 1.30, dur: 60 },
+        { id: 'chichi1999', nom: 'Chi-Chi 1999', mag: 7.6, pga: 1.01, dur: 40 },
+        { id: 'chile2010', nom: 'Maule 2010', mag: 8.8, pga: 0.78, dur: 150 },
+        { id: 'chile1960', nom: 'Valdivia 1960', mag: 9.5, pga: 0.50, dur: 300, est: true },
+        { id: 'laquila2009', nom: 'L\'Aquila 2009', mag: 6.3, pga: 0.66, dur: 20 },
+        { id: 'amatrice2016', nom: 'Amatrice 2016', mag: 6.2, pga: 0.90, dur: 15 },
+        { id: 'izmit1999', nom: 'İzmit 1999', mag: 7.6, pga: 0.41, dur: 45 },
+        { id: 'turkey2023', nom: 'Kahramanmaraş 2023', mag: 7.8, pga: 1.50, dur: 90 },
+        { id: 'haiti2010', nom: 'Port-au-Prince 2010', mag: 7.0, pga: 0.50, dur: 35, est: true },
+        { id: 'nepal2015', nom: 'Gorkha 2015', mag: 7.8, pga: 0.18, dur: 50 },
+        { id: 'mexico1985', nom: 'Mexico 1985', mag: 8.0, pga: 0.17, dur: 180 },
+        { id: 'mexico2017', nom: 'Puebla 2017', mag: 7.1, pga: 0.40, dur: 20 }
+    ];
+
+    /* ---------------------------------------------------------------- outils */
+    function borne(x, a, b) { return x < a ? a : (x > b ? b : x); }
+    function mat4() { return [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]; }
+    function ressort(K, i, j, k) { K[i][i] += k; K[j][j] += k; K[i][j] -= k; K[j][i] -= k; }
+    function inverse4(A) {
+        var M = [], i, j, k, p, f, tmp, R = [];
+        for (i = 0; i < 4; i++) { M[i] = [A[i][0], A[i][1], A[i][2], A[i][3], i === 0 ? 1 : 0, i === 1 ? 1 : 0, i === 2 ? 1 : 0, i === 3 ? 1 : 0]; }
+        for (i = 0; i < 4; i++) {
+            p = i;
+            for (k = i + 1; k < 4; k++) { if (Math.abs(M[k][i]) > Math.abs(M[p][i])) { p = k; } }
+            tmp = M[i]; M[i] = M[p]; M[p] = tmp;
+            f = M[i][i];
+            for (j = 0; j < 8; j++) { M[i][j] /= f; }
+            for (k = 0; k < 4; k++) {
+                if (k !== i) { f = M[k][i]; if (f !== 0) { for (j = 0; j < 8; j++) { M[k][j] -= f * M[i][j]; } } }
+            }
+        }
+        for (i = 0; i < 4; i++) { R[i] = [M[i][4], M[i][5], M[i][6], M[i][7]]; }
+        return R;
+    }
+    function prng(graine) {
+        var a = Math.imul(graine | 0, 0x9E3779B1) >>> 0;
+        if (!a) { a = 1; }
+        return function () {
+            a = (a + 0x6D2B79F5) | 0;
+            var t = Math.imul(a ^ (a >>> 15), 1 | a);
+            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+    }
+
+    /* ----------------------------------------------------------------- signal */
+    function passeHaut(x, fc, dt) {
+        var w0 = 2 * PI * fc * dt, cw = Math.cos(w0), al = Math.sin(w0) / Math.SQRT2;
+        var a0 = 1 + al, b0 = (1 + cw) / 2 / a0, b1 = -(1 + cw) / a0, b2 = b0, a1 = -2 * cw / a0, a2 = (1 - al) / a0;
+        var n = x.length, tmp = new Float64Array(n);
+        function passe(src, dst, sens) {
+            var x1 = 0, x2 = 0, y1 = 0, y2 = 0, k, i, xi, yi;
+            for (k = 0; k < n; k++) {
+                i = sens > 0 ? k : n - 1 - k;
+                xi = src[i];
+                yi = b0 * xi + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+                x2 = x1; x1 = xi; y2 = y1; y1 = yi;
+                dst[i] = yi;
+            }
+        }
+        passe(x, tmp, 1);
+        passe(tmp, x, -1);
+        return x;
+    }
+    /* Spectre élastique EC8 type 1, 5 %, ancré sur le PGA du site */
+    function spectreEC8(T, sol, pgaSite) {
+        var p = HYP.ec8[sol], TB = p[1], TC = p[2], TD = p[3];
+        if (T <= TB) { return pgaSite * (1 + 1.5 * T / TB); }
+        if (T <= TC) { return 2.5 * pgaSite; }
+        if (T <= TD) { return 2.5 * pgaSite * TC / T; }
+        return 2.5 * pgaSite * TC * TD / (T * T);
+    }
+    /* Accélérogramme artificiel compatible spectre (somme de sinusoïdes, correction itérative) */
+    function signalEC8(sol, pgaSite, duree, graine) {
+        var P = HYP.signal, dt = HYP.dt, dur = borne(duree, P.durMin, P.durMax), n = Math.ceil(dur / dt) + 1;
+        var nf = P.nf, rnd = prng(graine), w = [], A = [], cw = [], sw = [], ph = [], cible = [], k, i, it, t;
+        var env = new Float64Array(n), ag = new Float64Array(n);
+        var t1 = 0.12 * dur, t2 = Math.max(t1 + 10, 0.6 * dur), cd = Math.log(20) / Math.max(dur - t2, 1);
+        for (i = 0; i < n; i++) { t = i * dt; env[i] = t < t1 ? (t / t1) * (t / t1) : (t < t2 ? 1 : Math.exp(-cd * (t - t2))); }
+        for (k = 0; k < nf; k++) {
+            w[k] = 2 * PI * P.fmin * Math.pow(P.fmax / P.fmin, k / (nf - 1));
+            cw[k] = Math.cos(w[k] * dt); sw[k] = Math.sin(w[k] * dt);
+            ph[k] = 2 * PI * rnd();
+            cible[k] = spectreEC8(2 * PI / w[k], sol, pgaSite);
+            A[k] = cible[k];
+        }
+        function synthese() {
+            var s, c, sn, cs, tmp;
+            for (i = 0; i < n; i++) { ag[i] = 0; }
+            for (k = 0; k < nf; k++) {
+                sn = Math.sin(ph[k]); cs = Math.cos(ph[k]); s = A[k]; c = cw[k];
+                for (i = 0; i < n; i++) {
+                    ag[i] += s * sn * env[i];
+                    tmp = sn * c + cs * sw[k];
+                    cs = cs * c - sn * sw[k];
+                    sn = tmp;
+                }
+            }
+        }
+        function psa(om) {
+            var z = 0.05, kh = om * om + 2 * z * om * 2 / dt + 4 / (dt * dt), u = 0, v = 0, a = 0, u1, umax = 0, p;
+            for (i = 1; i < n; i++) {
+                p = -ag[i] + 4 / (dt * dt) * u + 4 / dt * v + a + 2 * z * om * (2 / dt * u + v);
+                u1 = p / kh;
+                a = 4 / (dt * dt) * (u1 - u) - 4 / dt * v - a;
+                v = 2 / dt * (u1 - u) - v;
+                u = u1;
+                if (Math.abs(u) > umax) { umax = Math.abs(u); }
+            }
+            return om * om * umax;
+        }
+        for (it = 0; it < P.iter; it++) {
+            synthese();
+            for (k = 0; k < nf; k++) { A[k] *= cible[k] / Math.max(psa(w[k]), 1e-9); }
+        }
+        synthese();
+        passeHaut(ag, 0.1, dt);
+        var lr = 0;
+        for (k = 0; k < nf; k++) { lr += Math.log(cible[k] / Math.max(psa(w[k]), 1e-9)); }
+        lr = Math.exp(lr / nf);
+        for (i = 0; i < n; i++) { ag[i] *= lr; }
+        return ag;
+    }
+    function signalSeisme(sol, qi) { var q = SEISMES[qi]; return signalEC8(sol, q.pga * G, q.dur, qi + 1); }
+
+    /* ------------------------------------------------------------- intégration
+       DDL : 0 radier haut (sur appuis), 1 villa ; 2 et 3 réservés (inactifs).
+       Newmark-β accélération moyenne ; Newton exact par branche + Sherman-Morrison. */
+    function simuler(cfg, ag) {
+        var dt = cfg.dt, n = ag.length, leger = !!cfg.leger, pas = cfg.pas || 1, nh = leger ? 0 : Math.ceil(n / pas);
+        var a0 = 4 / (dt * dt), a1 = 2 / dt, a2 = 4 / dt;
+        var M = [cfg.mb, cfg.mv, 1, 1], libre = [!cfg.fixe, true, false, false];
+        var K = mat4(), C = mat4(), K0 = mat4(), r, c, k, e;
+        ressort(K, 0, 1, cfg.kw); ressort(C, 0, 1, cfg.cw);
+        if (!cfg.fixe && cfg.cIso) { C[0][0] += cfg.cIso; }
+        var el = cfg.fixe ? [] : (cfg.elems || []), nE = el.length, but = cfg.fixe ? null : (cfg.butee || null);
+        var Fb = 0, kb = 0, contact = false, contactPrec = false;
+        for (r = 0; r < 4; r++) { for (c = 0; c < 4; c++) { K0[r][c] = K[r][c] + a1 * C[r][c] + (r === c ? a0 * M[r] : 0); } }
+        for (r = 0; r < 4; r++) { if (!libre[r]) { for (c = 0; c < 4; c++) { K0[r][c] = 0; K0[c][r] = 0; } K0[r][r] = 1; } }
+        var Kinv = inverse4(K0), c0 = [Kinv[0][0], Kinv[1][0], Kinv[2][0], Kinv[3][0]];
+        var u = [0, 0, 0, 0], v = [0, 0, 0, 0], a = [0, 0, 0, 0], un = [0, 0, 0, 0], vn = [0, 0, 0, 0], an = [0, 0, 0, 0];
+        var at = [0, 0, 0, 0], vt = [0, 0, 0, 0], R = [0, 0, 0, 0], y = [0, 0, 0, 0];
+        var uc = [], Fc = [], Fe = [];
+        for (e = 0; e < nE; e++) { uc[e] = 0; Fc[e] = 0; Fe[e] = 0; }
+        var F = 0, kt = 0, sig = 0, sigPrec, i, iter, agi, accA, drv, Vv, s, f, x, ih = 1, Fd;
+        var h = leger ? null : { ub: new Float32Array(nh), dr: new Float32Array(nh), acc: new Float32Array(nh), F: new Float32Array(nh), Fb: new Float32Array(nh) };
+        var pic = { ub: 0, dr: 0, acc: 0, V: 0, F: 0, vb: 0, Fd: 0, pen: 0, Fb: 0, vImp: 0, nChoc: 0 };
+        function evaluer() {
+            var q, Ft, sup, inf, ex;
+            for (q = 0; q < 4; q++) {
+                at[q] = a0 * (u[q] - un[q]) - a2 * vn[q] - an[q];
+                vt[q] = a1 * (u[q] - un[q]) - vn[q];
+            }
+            F = 0; kt = 0; sig = 0;
+            for (q = 0; q < nE; q++) {
+                ex = el[q];
+                Ft = Fc[q] + ex.Ki * (u[0] - uc[q]);
+                sup = ex.Qd + ex.Kd * u[0];
+                inf = -ex.Qd + ex.Kd * u[0];
+                if (Ft > sup) { Fe[q] = sup; kt += ex.Kd; sig = sig * 3 + 1; }
+                else if (Ft < inf) { Fe[q] = inf; kt += ex.Kd; sig = sig * 3 + 2; }
+                else { Fe[q] = Ft; kt += ex.Ki; sig = sig * 3; }
+                F += Fe[q];
+            }
+            /* butée : F = k·δⁿ·(1 + λ·δ̇), raidissement brutal au-delà de l'écrasement sb */
+            Fb = 0; kb = 0; contact = false;
+            if (but) {
+                var sgn = u[0] > 0 ? 1 : -1, del = Math.abs(u[0]) - but.g, vv, dn, dn1, ff, kk;
+                if (del > 0) {
+                    vv = sgn * vt[0]; dn = Math.pow(del, but.n); dn1 = Math.pow(del, but.n - 1);
+                    ff = but.k * dn * (1 + but.lam * vv);
+                    kk = but.k * but.n * dn1 * (1 + but.lam * vv) + but.k * dn * but.lam * a1;
+                    if (del > but.sb) { ff += but.kh * (del - but.sb); kk += but.kh; }
+                    if (ff > 0) { Fb = sgn * ff; kb = kk > 0 ? kk : 0; contact = true; }
+                }
+                F += Fb; kt += kb;
+            }
+        }
+        for (i = 1; i < n; i++) {
+            agi = ag[i];
+            for (k = 0; k < 4; k++) { un[k] = u[k]; vn[k] = v[k]; an[k] = a[k]; }
+            evaluer();
+            for (iter = 0; iter < 40; iter++) {
+                for (r = 0; r < 4; r++) {
+                    s = -M[r] * (agi + at[r]) - (r === 0 ? F : 0);
+                    for (c = 0; c < 4; c++) { s -= C[r][c] * vt[c] + K[r][c] * u[c]; }
+                    R[r] = libre[r] ? s : 0;
+                }
+                for (r = 0; r < 4; r++) { y[r] = Kinv[r][0] * R[0] + Kinv[r][1] * R[1] + Kinv[r][2] * R[2] + Kinv[r][3] * R[3]; }
+                f = kt !== 0 ? kt * y[0] / (1 + kt * c0[0]) : 0;
+                x = 0;
+                for (k = 0; k < 4; k++) { u[k] += y[k] - f * c0[k]; if (Math.abs(y[k] - f * c0[k]) > x) { x = Math.abs(y[k] - f * c0[k]); } }
+                sigPrec = sig;
+                evaluer();
+                if ((nE === 0 || sig === sigPrec) && (!contact || x < 1e-9)) { break; }
+            }
+            for (k = 0; k < 4; k++) { a[k] = at[k]; v[k] = vt[k]; }
+            for (e = 0; e < nE; e++) { uc[e] = u[0]; Fc[e] = Fe[e]; }
+            accA = a[1] + agi;
+            drv = u[1] - u[0];
+            Vv = M[1] * accA;
+            Fd = (cfg.cIso || 0) * v[0];
+            x = u[0] < 0 ? -u[0] : u[0]; if (x > pic.ub) { pic.ub = x; }
+            x = drv < 0 ? -drv : drv; if (x > pic.dr) { pic.dr = x; }
+            x = accA < 0 ? -accA : accA; if (x > pic.acc) { pic.acc = x; }
+            x = Vv < 0 ? -Vv : Vv; if (x > pic.V) { pic.V = x; }
+            x = F < 0 ? -F : F; if (x > pic.F) { pic.F = x; }
+            x = v[0] < 0 ? -v[0] : v[0]; if (x > pic.vb) { pic.vb = x; }
+            x = Fd < 0 ? -Fd : Fd; if (x > pic.Fd) { pic.Fd = x; }
+            if (contact) {
+                if (!contactPrec) { pic.nChoc++; x = Math.abs(vn[0]); if (x > pic.vImp) { pic.vImp = x; } }
+                x = Math.abs(u[0]) - but.g; if (x > pic.pen) { pic.pen = x; }
+                x = Math.abs(Fb); if (x > pic.Fb) { pic.Fb = x; }
+            }
+            contactPrec = contact;
+            if (!leger && i % pas === 0 && ih < nh) { h.ub[ih] = u[0]; h.dr[ih] = drv; h.acc[ih] = accA; h.F[ih] = F; h.Fb[ih] = Fb; ih++; }
+        }
+        return { pic: pic, h: h };
+    }
+
+    /* ------------------------------------------------------------ architecture */
+    function architecture() {
+        var H = HYP, S = H.maison.L * H.maison.B;
+        var RH = H.radierHaut, rad = RH.poutres * RH.L * RH.b * RH.h * H.rhoBA + RH.plancher * RH.L * RH.B;
+        var mursDemi = 0.5 * H.murs.lineaire * H.maison.h * H.murs.masseSurf;
+        var psiQ = H.psi2 * H.Q * S;
+        var aTot = H.murs.lineaire * H.murs.ep, aDir = H.murs.lgDir * H.murs.ep;
+        var A = { mb: rad + mursDemi + psiQ, mv: mursDemi + H.toiture * S, kw: H.murs.kw, rad: rad };
+        A.VR = (H.murs.fvk0 + 0.4 * A.mv * G / aTot) * aDir;
+        A.W = (A.mb + A.mv) * G;
+        A.cw = 2 * H.murs.zeta * Math.sqrt(A.kw * A.mv);
+        return A;
+    }
+
+    /* ----------------------------------------------------------- dispositions */
+    function demiPortee() { return HYP.radierHaut.L / 2 - 0.5; }
+    function positions(g, motif) {
+        var pts = [], ix, iy, x, y, perim, coin, t, d = demiPortee();
+        for (ix = 0; ix < g; ix++) {
+            for (iy = 0; iy < g; iy++) {
+                x = -d + 2 * d * ix / (g - 1); y = -d + 2 * d * iy / (g - 1);
+                perim = ix === 0 || ix === g - 1 || iy === 0 || iy === g - 1;
+                coin = (ix === 0 || ix === g - 1) && (iy === 0 || iy === g - 1);
+                if (motif === 'css') { t = 'P'; }
+                else { t = (motif === 'tous' || (motif === 'perim' && perim) || (motif === 'coins' && coin)) ? 'L' : 'S'; }
+                pts.push({ x: x, y: y, t: t });
+            }
+        }
+        return pts;
+    }
+    /* Configuration complète (appuis + positions) à partir d'une solution */
+    function conf(sl) {
+        var pts = positions(sl.g, sl.motif), c = { g: sl.g, motif: sl.motif, fam: sl.fam, modele: sl.modele, R: sl.R,
+                                                     course: sl.course, pts: pts, nL: 0, nS: 0, nP: 0 }, i;
+        for (i = 0; i < pts.length; i++) { if (pts[i].t === 'L') { c.nL++; } else if (pts[i].t === 'S') { c.nS++; } else { c.nP++; } }
+        return c;
+    }
+    function capacite(c) {
+        if (c.fam === 'css') { return c.course; }
+        var cap = HYP.gammaAdm * LRB_DB[c.modele].Tr / 1000;
+        return c.nS ? Math.min(cap, HYP.gliss.course) : cap;
+    }
+    function keffLRB(modele, D) {
+        var d = LRB_DB[modele], Ki = d.Ki * 1e6, Kd = d.Kd * 1e6, Qd = d.Qd * 1e3, Dy = Qd / (Ki - Kd);
+        return D <= Dy ? Ki : Qd / D + Kd;
+    }
+    /* EC8 : amplification de torsion accidentelle à l'appui d'angle, δ = 1 + e·y / r² */
+    function deltaTorsion(c, D, W) {
+        var n = c.pts.length, N = W / n, kL, kS, kP, sk = 0, skr = 0, i, p, kk;
+        kL = c.fam === 'lrb' ? keffLRB(c.modele, D) : 0;
+        kS = HYP.gliss.mu * N / Math.max(D, HYP.gliss.dy);
+        kP = c.fam === 'css' ? N * (1 / c.R + HYP.css.mu / Math.max(D, HYP.css.dy)) : 0;
+        for (i = 0; i < n; i++) {
+            p = c.pts[i]; kk = p.t === 'L' ? kL : (p.t === 'S' ? kS : kP);
+            sk += kk; skr += kk * (p.x * p.x + p.y * p.y);
+        }
+        return 1 + HYP.eAcc * HYP.radierHaut.L * demiPortee() / (skr / sk);
+    }
+
+    /* ------------------------------------------------------------- butées
+       Nombre de pneus par côté pour absorber ½·M·v² à vDim ; jeu = (course − sb) / δ */
+    function butee(c, AR) {
+        var B = HYP.butee, M = AR.mb + AR.mv, E = 0.5 * M * B.vDim * B.vDim, N = Math.max(2, Math.ceil(E / B.E1));
+        var cap = capacite(c), cd = { g: c.g || 3, pts: c.pts }, dl, g, k;
+        dl = deltaTorsion(c, cap, AR.W);
+        g = Math.max(0.03, (cap - B.sb) / dl);
+        k = (B.n + 1) * N * B.E1 / Math.pow(B.sb, B.n + 1);
+        return { N: N, g: g, k: k, n: B.n, sb: B.sb, lam: 3 * (1 - B.e) / (2 * B.v0), kh: B.kh };
+    }
+
+    /* ------------------------------------------------------------- dommages */
+    function courbeDR(x, s) {
+        var px = [0.5 * s[0], s[0], s[1], s[2], s[3]], py = [0, HYP.tauxDS[0], HYP.tauxDS[1], HYP.tauxDS[2], HYP.tauxDS[3]], k, f;
+        if (!(x > px[0])) { return 0; }
+        if (x >= px[4]) { return 1; }
+        for (k = 0; k < 4; k++) {
+            if (x <= px[k + 1]) { f = Math.log(x / px[k]) / Math.log(px[k + 1] / px[k]); return py[k] + f * (py[k + 1] - py[k]); }
+        }
+        return 1;
+    }
+    function etatDS(x, s) { var d = 0, k; for (k = 0; k < 4; k++) { if (x >= s[k]) { d = k + 1; } } return d; }
+    function casse(r, AR) {
+        var acc = r.pic.acc / G, DCR = Math.max(r.pic.V / AR.VR, acc / HYP.murs.aHP);
+        var drS = courbeDR(DCR, HYP.seuilsS), drA = courbeDR(acc, HYP.seuilsA);
+        return { DR: drS >= 1 ? 1 : Math.min(1, HYP.poidsS * drS + HYP.poidsA * drA),
+                 DS: Math.max(etatDS(DCR, HYP.seuilsS), etatDS(acc, HYP.seuilsA)), acc: acc, D: r.pic.ub, Fd: r.pic.Fd,
+                 choc: r.pic.nChoc > 0, Ei: 0.5 * (AR.mb + AR.mv) * r.pic.vImp * r.pic.vImp, Fb: r.pic.Fb, pen: r.pic.pen };
+    }
+
+    /* --------------------------------------------------------- configuration calcul
+       dyn = { fam:'lrb', modele, g, motif, zeta } ou { fam:'css', R, zeta } */
+    function kRef(dyn, c, W) {
+        if (dyn.fam === 'css') { return W / dyn.R; }
+        return LRB_DB[dyn.modele].Kd * 1e6 * c.nL;
+    }
+    function cfgDyn(dyn, AR, leger, pas) {
+        var elems = [], c = dyn.fam === 'lrb' ? conf({ g: dyn.g, motif: dyn.motif, fam: 'lrb', modele: dyn.modele })
+                                               : conf({ g: 5, motif: 'css', fam: 'css', R: dyn.R, course: dyn.course }), d, qs;
+        if (dyn.fam === 'css') {
+            qs = HYP.css.mu * AR.W;
+            elems.push({ Ki: qs / HYP.css.dy, Kd: AR.W / dyn.R, Qd: qs });
+        } else {
+            d = LRB_DB[dyn.modele];
+            elems.push({ Ki: d.Ki * 1e6 * c.nL, Kd: d.Kd * 1e6 * c.nL, Qd: d.Qd * 1e3 * c.nL });
+            if (c.nS) { qs = HYP.gliss.mu * AR.W * c.nS / (c.nL + c.nS); elems.push({ Ki: qs / HYP.gliss.dy, Kd: 0, Qd: qs }); }
+        }
+        var C = dyn.zeta > 0 ? 2 * dyn.zeta * Math.sqrt(kRef(dyn, c, AR.W) * (AR.mb + AR.mv)) : 0;
+        return { dt: HYP.dt, mb: AR.mb, mv: AR.mv, kw: AR.kw, cw: AR.cw, fixe: false, elems: elems, cIso: C, leger: leger, pas: pas || 1,
+                 butee: butee(c, AR) };
+    }
+    function dynamiques() {
+        var l = [], mods = Object.keys(LRB_DB), gi, mo, mi, zi, R, Z = HYP.amort.zetas, g, mot, pts, nS, k;
+        for (gi = 0; gi < HYP.grilles.length; gi++) {
+            g = HYP.grilles[gi];
+            for (mo = 0; mo < HYP.motifs.length; mo++) {
+                mot = HYP.motifs[mo]; pts = positions(g, mot); nS = 0;
+                for (k = 0; k < pts.length; k++) { if (pts[k].t === 'S') { nS++; } }
+                if (mot !== 'tous' && nS === 0) { continue; }
+                for (mi = 0; mi < mods.length; mi++) {
+                    for (zi = 0; zi < Z.length; zi++) { l.push({ fam: 'lrb', modele: mods[mi], g: g, motif: mot, zeta: Z[zi] }); }
+                }
+            }
+        }
+        for (R = 0; R < HYP.css.R.length; R++) {
+            for (zi = 0; zi < Z.length; zi++) {
+                for (k = 0; k < HYP.css.courses.length; k++) { l.push({ fam: 'css', R: HYP.css.R[R], zeta: Z[zi], course: HYP.css.courses[k] }); }
+            }
+        }
+        return l;
+    }
+
+    /* ------------------------------------------------------------- optimiseur */
+    function optimiseur(sol) {
+        var nq = SEISMES.length, AR = architecture(), DYN = dynamiques(), signaux = [], fileT = [], pos = 0, fait = 0, total = 0, i, k;
+        var fixe = { q: [] };
+        for (k = 0; k < nq; k++) { fileT.push([null, k]); total += SEISMES[k].dur; }
+        for (i = 0; i < DYN.length; i++) {
+            DYN[i].res = [];
+            var cf0 = cfgDyn(DYN[i], AR, true); DYN[i].C = cf0.cIso; DYN[i].but = cf0.butee;
+            for (k = 0; k < nq; k++) { fileT.push([DYN[i], k]); total += SEISMES[k].dur; }
+        }
+        function signal(k) { if (!signaux[k]) { signaux[k] = signalSeisme(sol, k); } return signaux[k]; }
+
+        function resumer(q) {
+            var n = q.length, s = 0, mx = 0, ok = 0, rupt = 0, joint = 0, j;
+            for (j = 0; j < n; j++) {
+                s += q[j].DR; if (q[j].DR > mx) { mx = q[j].DR; }
+                if (q[j].DS === 0) { ok++; }
+                if (q[j].rupt) { rupt++; } else if (q[j].dc > joint) { joint = q[j].dc; }
+            }
+            return { drMoy: s / n, drMax: mx, nOK: ok, nRupt: rupt, joint: Math.ceil(joint * 1.1 * 100) / 100 };
+        }
+        function compacter(q) {
+            var o = { DR: [], rupt: [], acc: [], dc: [], DS: [], choc: [], Ei: [], Fb: [] }, j;
+            for (j = 0; j < q.length; j++) {
+                o.DR.push(q[j].DR); o.rupt.push(q[j].rupt); o.acc.push(q[j].acc); o.dc.push(q[j].dc); o.DS.push(q[j].DS);
+                o.choc.push(!!q[j].choc); o.Ei.push(q[j].Ei || 0); o.Fb.push(q[j].Fb || 0);
+            }
+            return o;
+        }
+        function solution(dyn, g, motif, course) {
+            var sl = { fam: dyn.fam, modele: dyn.modele, R: dyn.R, g: g, motif: motif, course: course, zeta: dyn.zeta, C: dyn.C };
+            var c = conf(sl), cap = capacite(c), q = [], j, b, dc;
+            for (j = 0; j < nq; j++) {
+                b = dyn.res[j];
+                dc = deltaTorsion(c, b.D, AR.W) * b.D;
+                q.push({ DR: dc > cap ? 1 : b.DR, DS: dc > cap ? 4 : b.DS, rupt: dc > cap, acc: b.acc, dc: dc, choc: b.choc, Ei: b.Ei, Fb: b.Fb });
+            }
+            var r = resumer(q), cle, nch = 0, emax = 0;
+            sl.nL = c.nL; sl.nS = c.nS; sl.nP = c.nP; sl.cap = cap;
+            sl.gap = dyn.but.g; sl.nPneu = dyn.but.N;
+            for (j = 0; j < nq; j++) { if (q[j].choc && !q[j].rupt) { nch++; if (q[j].Ei > emax) { emax = q[j].Ei; } } }
+            sl.nChoc = nch; sl.EiMax = emax;
+            if (dyn.res0) {
+                var s0 = 0, b0, dc0, DR0 = [], R0 = [];
+                for (j = 0; j < nq; j++) {
+                    b0 = dyn.res0[j]; dc0 = deltaTorsion(c, b0.D, AR.W) * b0.D;
+                    R0.push(dc0 > cap); DR0.push(dc0 > cap ? 1 : b0.DR); s0 += DR0[j];
+                }
+                sl.drMoy0 = s0 / nq;
+            }
+            sl.drMoy = r.drMoy; sl.drMax = r.drMax; sl.nOK = r.nOK; sl.nRupt = r.nRupt; sl.joint = r.joint;
+            sl.FdMax = 0; for (j = 0; j < nq; j++) { if (!q[j].rupt && dyn.res[j].Fd > sl.FdMax) { sl.FdMax = dyn.res[j].Fd; } }
+            sl.q = compacter(q);
+            if (dyn.res0) { sl.q.DR0 = DR0; sl.q.rupt0 = R0; }
+            cle = dyn.fam === 'css' ? 'P' + dyn.R + '_' + g + '_' + course : 'L' + dyn.modele + '_' + g + motif;
+            sl.id = cle + '_z' + Math.round(dyn.zeta * 100);
+            return sl;
+        }
+        function finaliser() {
+            var sols = [], j, gi, ci, rf = resumer(fixe.q);
+            for (j = 0; j < DYN.length; j++) {
+                if (DYN[j].fam === 'lrb') { sols.push(solution(DYN[j], DYN[j].g, DYN[j].motif, null)); }
+                else {
+                    for (gi = 0; gi < HYP.grilles.length; gi++) { sols.push(solution(DYN[j], HYP.grilles[gi], 'css', DYN[j].course)); }
+                }
+            }
+            rf.q = compacter(fixe.q);
+            return { sol: sol, nq: nq, fixe: rf, solutions: sols, AR: { W: AR.W, mb: AR.mb, mv: AR.mv, VR: AR.VR, rad: AR.rad } };
+        }
+        var o = { fini: false, progres: 0, resultat: null };
+        o.step = function () {
+            if (pos < fileT.length) {
+                var it = fileT[pos++], dyn = it[0], k2 = it[1], ag = signal(k2), r, cs;
+                if (!dyn) {
+                    r = simuler({ dt: HYP.dt, mb: AR.mb, mv: AR.mv, kw: AR.kw, cw: AR.cw, fixe: true, elems: [], leger: true }, ag);
+                    cs = casse(r, AR); cs.rupt = false; cs.dc = 0;
+                    fixe.q[k2] = cs;
+                } else {
+                    r = simuler(cfgDyn(dyn, AR, true), ag);
+                    dyn.res[k2] = casse(r, AR);
+                    if (dyn.fam === 'css') {
+                        var cf0b = cfgDyn(dyn, AR, true); cf0b.butee = null;
+                        if (!dyn.res0) { dyn.res0 = []; }
+                        dyn.res0[k2] = casse(simuler(cf0b, ag), AR);
+                    }
+                }
+                fait += SEISMES[k2].dur;
+                o.progres = Math.min(0.999, fait / total);
+                return;
+            }
+            o.resultat = finaliser();
+            o.progres = 1; o.fini = true;
+        };
+        return o;
+    }
+
+    /* Historique détaillé : base fixe + solution choisie */
+    function detail(sol, qi, sl) {
+        var AR = architecture(), ag = signalSeisme(sol, qi), pas = Math.max(1, Math.ceil(ag.length / 8000)), i;
+        var dyn = { fam: sl.fam, modele: sl.modele, R: sl.R, g: sl.g, motif: sl.motif, zeta: sl.zeta, course: sl.course };
+        var rf = simuler({ dt: HYP.dt, mb: AR.mb, mv: AR.mv, kw: AR.kw, cw: AR.cw, fixe: true, elems: [], leger: false, pas: pas }, ag);
+        var ri = simuler(cfgDyn(dyn, AR, false, pas), ag);
+        var c = conf(sl), nh = ri.h.ub.length, agh = new Float32Array(nh);
+        for (i = 0; i < nh; i++) { agh[i] = ag[i * pas] / G; }
+        var cf = cfgDyn(dyn, AR, true);
+        return { dt: HYP.dt * pas, ag: agh, fixe: rf.h, iso: ri.h, delta: deltaTorsion(c, ri.pic.ub, AR.W), cap: capacite(c), gap: cf.butee.g };
+    }
+
+    function executer(job) { var o = optimiseur(job.sol); while (!o.fini) { o.step(); } return o.resultat; }
+
+    return { butee: butee, G: G, HYP: HYP, LRB_DB: LRB_DB, SEISMES: SEISMES, architecture: architecture, positions: positions, conf: conf,
+             spectreEC8: spectreEC8, signalSeisme: signalSeisme, simuler: simuler, dynamiques: dynamiques,
+             optimiseur: optimiseur, detail: detail, executer: executer };
+})();
+
+</script>
+
+<script>
+(function () {
+    'use strict';
+
+    var T = {
+        fr: {
+            titre_page: 'Isolation sismique v15', titre: 'Isolation sismique : prix contre risque',
+            soustitre: 'Maison plain-pied 12 × 12 m · fondation sandwich · 4 classes de sol · 21 séismes',
+            sec_hyp: 'Modèle de construction et hypothèses', sec_prix: 'Prix (modifiables, recalcul instantané)',
+            b_run: 'Relancer le calcul', sec_synth: 'Synthèse par type de terrain',
+            pied: 'v15.1 · Newmark-β + Newton-Raphson · LRB / glissants / pendules à friction / amortisseurs visqueux · spectre EC8 type 1 · torsion accidentelle EC8',
+            sol_A: 'A – Rocher', sol_B: 'B – Sol ferme', sol_C: 'C – Sol moyen', sol_D: 'D – Sol mou',
+            st_calc: 'Calcul en cours — {p} %', st_fini: 'Terminé en {s} s', st_err: 'Erreur : ', st_attente: 'Calcul en attente',
+            h_maison: 'Maison', v_maison: 'plain-pied 12 × 12 m, parpaing chaîné 20 cm, tôle sur charpente, hauteur 2,8 m',
+            h_sand: 'Fondation', v_sand: 'sandwich : radier bas 0,30 m coulé au sol, élargi pour porter le muret de butée / vide technique 0,8 m ventilé avec appuis et amortisseurs / radier haut nervuré',
+            h_rh: 'Radier haut', v_rh: '6 poutres BA 30 × 50 sur les lignes d\'appuis + poutrelles-hourdis 20+5 chaînés (diaphragme rigide) : {m} t',
+            h_but: 'Butées', v_but: 'muret BA 30 × 80 cm sur le radier bas ; pneus de poids lourd (≈ 10 kJ, écrasement 15 cm) ; nombre par côté pour ½·M·v² à 1 m/s ; jeu = course − 15 cm',
+            h_chem: 'Chemin de propreté', v_chem: 'débord de 0,5 m du radier haut, surélevé, libre de se déplacer',
+            h_mass: 'Masses', v_mass: 'radier haut nervuré + ½ murs + ψ₂Q : {mb} t ; haut des murs + toiture : {mv} t ; poids total {w} kN',
+            h_murs: 'Murs', v_murs: 'K = 700 MN/m ; résistance au cisaillement V_R = {vr} kN ; hors plan 0,6 g',
+            h_lrb: 'LRB', v_lrb: 'D400 à D1000 (devis) ; course = 2,5 × Tr (EN 15129) ; seuls ou avec appuis glissants plans (μ = 0,03)',
+            h_css: 'Pendules à friction', v_css: 'R = 3, 4, 5, 6 m (T ≈ 3,5 à 4,9 s) ; μ = 0,04 ; course 40 / 60 / 80 cm ; plaque fixée sous le radier haut',
+            h_amo: 'Amortisseurs visqueux', v_amo: 'entre radiers, 0 / 10 / 20 / 30 % d\'amortissement ; nombre selon l\'effort maximal, 2 directions',
+            h_grille: 'Dispositions', v_grille: 'grilles 3×3, 4×4, 5×5 ; LRB partout, en périphérie ou aux angles',
+            h_tor: 'Torsion', v_tor: 'excentricité accidentelle 5 % (EC8), contrôle à l\'appui d\'angle',
+            h_sei: 'Séismes', v_sei: '21 événements ; PGA enregistré appliqué au site ; accélérogramme compatible spectre EC8 type 1 du sol ; durée 20–60 s',
+            h_cas: 'Casse', v_cas: 'murs (V/V_R ou a/0,6 g) : 0,7 / 1 / 1,5 / 2,5 ; contenus 0,25 / 0,5 / 1 / 2 g ; taux 2 / 10 / 50 / 100 % ; appui hors course = 100 %',
+            h_risque: 'Risque', v_risque: 'casse moyenne sur les 21 séismes (poids égaux), en % de la valeur de la maison',
+            p_gliss: 'Appui glissant (€)', p_pend40: 'Pendule ±40 cm (€)', p_pend60: 'Pendule ±60 cm (€)', p_pend80: 'Pendule ±80 cm (€)',
+            p_amort: 'Amortisseur visqueux (€)', p_fUnit: 'Effort par amortisseur (kN)', p_beton: 'Béton armé posé (€/m³)',
+            p_vide: 'Forfait vide technique (€)', p_pneu: 'Pneu posé (€)', p_valeur: 'Valeur de la maison (€)', devis: 'LRB (devis, €/pièce) : {l}',
+            s_sol: 'Terrain', s_sans: 'Sans isolation', s_petit: 'Petit budget (casse ÷ 2)', s_rapport: 'Meilleur rapport', s_min: 'Casse minimale',
+            r_petit: 'Petit budget', r_rapport: 'Meilleur rapport', r_min: 'Casse min.',
+            sec_nuage: 'Prix contre risque — {s}',
+            nuage_note: 'Chaque point est une configuration d\'appuis. La ligne relie les meilleurs compromis : pour ce prix, aucune autre configuration ne casse moins. Cliquez un point pour le détail.',
+            lg_lrb: 'LRB seuls', lg_lrbs: 'LRB + glissants', lg_css: 'pendules à friction', lg_fixe: 'sans isolation', lg_amo: 'anneau = avec amortisseurs', lg_front: 'meilleurs compromis',
+            ax_cout: 'Surcoût de l\'isolation (k€)', ax_cas: 'Casse moyenne (%)',
+            sec_sel: 'Configuration sélectionnée', t_cas: 'Casse moyenne', t_cout: 'Surcoût total (€)', t_ok: 'Séismes sans dommage',
+            t_rupt: 'Appuis hors course', t_joint: 'Joint autour du radier (cm)', t_amo: 'Amortisseurs', t_evite: 'Casse évitée / € investi',
+            ventil: 'appuis {a} € · amortisseurs {m} € · sandwich, muret et pneus {s} €',
+            d_lrb: '{nl} LRB {mod}', d_gl: ' + {ns} appuis glissants', d_gl1: ' + 1 appui glissant', d_grille: ', grille {g}×{g}',
+            d_css: '{n} pendules à friction R = {R} m, course ±{c} cm', d_amo: ' + {n} amortisseurs visqueux ({z} %)',
+            c_sans: 'Sans isolation', c_lrb: 'LRB', c_lrbs: 'LRB + gl.', c_css: 'Pendules',
+            sec_coupe: 'Coupe du sandwich', sec_plan: 'Plan des appuis', sec_hm: 'Casse par séisme (% de la valeur)',
+            c_q: 'Séisme', c_m: 'M', c_pga: 'PGA (g)', c_sel: 'Sélection', hm_note: 'R = appui hors course. Cliquez une ligne pour l\'historique.',
+            sec_det: 'Historique : {q}', det_aide: 'Cliquez un séisme dans le tableau pour voir l\'historique.',
+            ch_acc: 'Accélération de la maison', ch_iso: 'Déplacement des appuis', ax_t: 'Temps (s)', ax_acc: 'Accélération (g)', ax_mm: 'Déplacement (mm)',
+            lg_sans: 'Sans isolation', lg_sel: 'Sélection', lg_scont: 'casse contenus 0,25 g', lg_smurs: 'rupture murs 0,6 g',
+            cause_rupt: 'Casse 100 % : l\'appui d\'angle se déplace de {d} mm pour une course de {c} mm.',
+            cause_acc: 'Casse {x} % : la maison subit {a} g (contenus endommagés dès 0,25 g, murs fissurés dès 0,42 g, ruine vers 1,5 g). Appui d\'angle {d} / {c} mm.',
+            cause_ok: 'Pas de casse : {a} g sur la maison, appui d\'angle {d} / {c} mm.', lg_centre: 'Centre', lg_angle: 'Appui d\'angle', lg_course: '± course',
+            sec_front: 'Meilleurs compromis ({n} sur {t} configurations)',
+            tp_conf: 'Configuration', tp_cout: 'Surcoût €', tp_cas: 'Casse %', tp_ok: 'Sans dommage', tp_rupt: 'Hors course', tp_joint: 'Joint cm',
+            k_bas: 'radier bas', k_haut: 'radier haut', k_vide: 'vide technique 0,8 m', k_joint: 'joint ≥ {j} cm', k_chem: 'chemin de propreté', k_jeu: 'jeu {j} cm', k_poutre: 'poutres du radier haut', k_pneus: 'pneus ({n} par côté)', k_muret: 'muret de butée',
+            t_jeu: 'Jeu avant butée (cm)', t_pneus: 'Pneus (4 côtés)', t_choc: 'Séismes avec choc en butée', t_ei: 'Énergie de choc max (kJ)',
+            r_ref: 'Référence', s_ref: 'Système de référence', tp_choc: 'Chocs',
+            c_sansp: 'Sans pneus', c_avecp: 'Avec pneus', c_pneus: 'Pneus : énergie (capacité)', t_sansp: 'Casse sans pneus', t_gainp: 'Gain des pneus (points)',
+            cause_sansp: ' Sans les pneus : {x0} %.', hm_note3: 'Sans pneus = même configuration, butées supprimées. R = hors course, B = choc en butée. % = part de la capacité des pneus d\'un côté utilisée. Cliquez une ligne pour l\'historique.',
+            cause_choc: 'Choc en butée : {e} kJ à absorber, effort {f} kN. La maison subit {a} g, casse {x} %.',
+            cause_rupt2: 'Casse 100 % : butées écrasées, l\'appui d\'angle atteint {d} mm pour {c} mm de course.',
+            lg_but: '± butée', hm_note2: 'R = butées écrasées (hors course), B = choc en butée. Cliquez une ligne pour l\'historique.',
+            k_amo: 'amortisseur', k_lrb: 'LRB (Ø à l\'échelle)', k_gl: 'appui glissant', k_pend: 'pendule à friction', k_cm: 'centre des masses',
+            vide: 'Pas encore de résultat'
+        },
+        en: {
+            titre_page: 'Seismic isolation v15', titre: 'Seismic isolation: price versus risk',
+            soustitre: 'Single-storey 12 × 12 m house · sandwich foundation · 4 soil classes · 21 earthquakes',
+            sec_hyp: 'Construction model and assumptions', sec_prix: 'Prices (editable, instant update)',
+            b_run: 'Re-run calculation', sec_synth: 'Summary by soil type',
+            pied: 'v15.1 · Newmark-β + Newton-Raphson · LRB / sliders / friction pendulums / viscous dampers · EC8 type 1 spectrum · EC8 accidental torsion',
+            sol_A: 'A – Rock', sol_B: 'B – Stiff soil', sol_C: 'C – Medium soil', sol_D: 'D – Soft soil',
+            st_calc: 'Computing — {p} %', st_fini: 'Done in {s} s', st_err: 'Error: ', st_attente: 'Waiting',
+            h_maison: 'House', v_maison: 'single storey 12 × 12 m, 20 cm confined blockwork, metal sheet on timber roof, height 2.8 m',
+            h_sand: 'Foundation', v_sand: 'sandwich: 0.30 m lower raft cast on ground, widened to carry the stop wall / 0.8 m ventilated crawl space with bearings and dampers / ribbed upper raft',
+            h_rh: 'Upper raft', v_rh: '6 RC beams 30 × 50 on the bearing lines + 20+5 beam-and-block floor tied in (rigid diaphragm): {m} t',
+            h_but: 'Bumpers', v_but: '30 × 80 cm RC stop wall on the lower raft; truck tyres (≈ 10 kJ, 15 cm crush); number per side for ½·M·v² at 1 m/s; gap = stroke − 15 cm',
+            h_chem: 'Perimeter path', v_chem: '0.5 m overhang of the upper raft, raised, free to move',
+            h_mass: 'Masses', v_mass: 'ribbed upper raft + ½ walls + ψ₂Q: {mb} t; upper walls + roof: {mv} t; total weight {w} kN',
+            h_murs: 'Walls', v_murs: 'K = 700 MN/m; shear strength V_R = {vr} kN; out-of-plane 0.6 g',
+            h_lrb: 'LRB', v_lrb: 'D400 to D1000 (quote); stroke = 2.5 × Tr (EN 15129); alone or with flat sliders (μ = 0.03)',
+            h_css: 'Friction pendulums', v_css: 'R = 3, 4, 5, 6 m (T ≈ 3.5 to 4.9 s); μ = 0.04; stroke 40 / 60 / 80 cm; plate fixed under the upper raft',
+            h_amo: 'Viscous dampers', v_amo: 'between rafts, 0 / 10 / 20 / 30 % damping; number from peak force, 2 directions',
+            h_grille: 'Layouts', v_grille: '3×3, 4×4, 5×5 grids; LRB everywhere, on the perimeter or at corners',
+            h_tor: 'Torsion', v_tor: '5 % accidental eccentricity (EC8), checked at the corner bearing',
+            h_sei: 'Earthquakes', v_sei: '21 events; recorded PGA applied at site; EC8 type 1 spectrum-compatible accelerogram for the soil; 20–60 s duration',
+            h_cas: 'Damage', v_cas: 'walls (V/V_R or a/0.6 g): 0.7 / 1 / 1.5 / 2.5; contents 0.25 / 0.5 / 1 / 2 g; ratios 2 / 10 / 50 / 100 %; bearing beyond stroke = 100 %',
+            h_risque: 'Risk', v_risque: 'mean damage over the 21 earthquakes (equal weights), in % of the house value',
+            p_gliss: 'Slider (€)', p_pend40: 'Pendulum ±40 cm (€)', p_pend60: 'Pendulum ±60 cm (€)', p_pend80: 'Pendulum ±80 cm (€)',
+            p_amort: 'Viscous damper (€)', p_fUnit: 'Force per damper (kN)', p_beton: 'Reinforced concrete (€/m³)',
+            p_vide: 'Crawl-space lump sum (€)', p_pneu: 'Tyre fitted (€)', p_valeur: 'House value (€)', devis: 'LRB (quote, €/unit): {l}',
+            s_sol: 'Soil', s_sans: 'No isolation', s_petit: 'Small budget (damage ÷ 2)', s_rapport: 'Best value', s_min: 'Minimum damage',
+            r_petit: 'Small budget', r_rapport: 'Best value', r_min: 'Min. damage',
+            sec_nuage: 'Price versus risk — {s}',
+            nuage_note: 'Each point is a bearing configuration. The line joins the best trade-offs: at that price, no other configuration does less damage. Click a point for details.',
+            lg_lrb: 'LRB only', lg_lrbs: 'LRB + sliders', lg_css: 'friction pendulums', lg_fixe: 'no isolation', lg_amo: 'ring = with dampers', lg_front: 'best trade-offs',
+            ax_cout: 'Isolation extra cost (k€)', ax_cas: 'Mean damage (%)',
+            sec_sel: 'Selected configuration', t_cas: 'Mean damage', t_cout: 'Total extra cost (€)', t_ok: 'Quakes without damage',
+            t_rupt: 'Bearings beyond stroke', t_joint: 'Gap around raft (cm)', t_amo: 'Dampers', t_evite: 'Damage avoided / € spent',
+            ventil: 'bearings €{a} · dampers €{m} · sandwich, wall and tyres €{s}',
+            d_lrb: '{nl} LRB {mod}', d_gl: ' + {ns} sliders', d_gl1: ' + 1 slider', d_grille: ', {g}×{g} grid',
+            d_css: '{n} friction pendulums R = {R} m, stroke ±{c} cm', d_amo: ' + {n} viscous dampers ({z} %)',
+            c_sans: 'No isolation', c_lrb: 'LRB', c_lrbs: 'LRB + sl.', c_css: 'Pendulums',
+            sec_coupe: 'Sandwich section', sec_plan: 'Bearing plan', sec_hm: 'Damage per earthquake (% of value)',
+            c_q: 'Earthquake', c_m: 'M', c_pga: 'PGA (g)', c_sel: 'Selection', hm_note: 'R = bearing beyond stroke. Click a row for the time history.',
+            sec_det: 'Time history: {q}', det_aide: 'Click an earthquake in the table to see the time history.',
+            ch_acc: 'House acceleration', ch_iso: 'Bearing displacement', ax_t: 'Time (s)', ax_acc: 'Acceleration (g)', ax_mm: 'Displacement (mm)',
+            lg_sans: 'No isolation', lg_sel: 'Selection', lg_scont: 'contents damage 0.25 g', lg_smurs: 'wall failure 0.6 g',
+            cause_rupt: 'Damage 100 %: the corner bearing moves {d} mm for a {c} mm stroke.',
+            cause_acc: 'Damage {x} %: the house undergoes {a} g (contents damaged from 0.25 g, walls cracked from 0.42 g, ruin near 1.5 g). Corner bearing {d} / {c} mm.',
+            cause_ok: 'No damage: {a} g on the house, corner bearing {d} / {c} mm.', lg_centre: 'Centre', lg_angle: 'Corner bearing', lg_course: '± stroke',
+            sec_front: 'Best trade-offs ({n} of {t} configurations)',
+            tp_conf: 'Configuration', tp_cout: 'Extra cost €', tp_cas: 'Damage %', tp_ok: 'No damage', tp_rupt: 'Beyond stroke', tp_joint: 'Gap cm',
+            k_bas: 'lower raft', k_haut: 'upper raft', k_vide: '0.8 m crawl space', k_joint: 'gap ≥ {j} cm', k_chem: 'perimeter path', k_jeu: 'gap {j} cm', k_poutre: 'upper raft beams', k_pneus: 'tyres ({n} per side)', k_muret: 'stop wall',
+            t_jeu: 'Gap to bumpers (cm)', t_pneus: 'Tyres (4 sides)', t_choc: 'Quakes hitting the bumpers', t_ei: 'Max impact energy (kJ)',
+            r_ref: 'Reference', s_ref: 'Reference system', tp_choc: 'Impacts',
+            c_sansp: 'Without tyres', c_avecp: 'With tyres', c_pneus: 'Tyres: energy (capacity)', t_sansp: 'Damage without tyres', t_gainp: 'Tyre gain (points)',
+            cause_sansp: ' Without tyres: {x0} %.', hm_note3: 'Without tyres = same configuration, bumpers removed. R = beyond stroke, B = bumper impact. % = share of one side\'s tyre capacity used. Click a row for the time history.',
+            cause_choc: 'Bumper impact: {e} kJ to absorb, force {f} kN. The house undergoes {a} g, damage {x} %.',
+            cause_rupt2: 'Damage 100 %: bumpers crushed, the corner bearing reaches {d} mm for a {c} mm stroke.',
+            lg_but: '± bumper', hm_note2: 'R = bumpers crushed (beyond stroke), B = bumper impact. Click a row for the time history.',
+            k_amo: 'damper', k_lrb: 'LRB (Ø to scale)', k_gl: 'slider', k_pend: 'friction pendulum', k_cm: 'centre of mass',
+            vide: 'No result yet'
+        }
+    };
+
+    var LANG = 'fr', SOLS = ['A', 'B', 'C', 'D'], RES = {}, ACTIF = 'C', SEL = {}, QSEL = null, DETAIL = null, OCCUPE = false, T0 = 0, DUREE = null;
+    var G = SIM.G, Q = SIM.SEISMES, H = SIM.HYP, PRIX = {}, k;
+    for (k in H.prix) { if (H.prix.hasOwnProperty(k)) { PRIX[k] = H.prix[k]; } }
+    var POINTS = [];
+
+    /* ---------------------------------------------------------------- outils */
+    function $(id) { return document.getElementById(id); }
+    function t(k) { var v = T[LANG][k]; return v === undefined ? k : v; }
+    function fmt(k, o) { return t(k).replace(/\{(\w+)\}/g, function (m, n) { return o[n] !== undefined ? o[n] : m; }); }
+    function num(x, d) {
+        if (!isFinite(x)) { return '–'; }
+        if (Math.abs(x) < 0.5 * Math.pow(10, -d)) { x = 0; }
+        var s = x.toFixed(d);
+        return LANG === 'fr' ? s.replace('.', ',') : s;
+    }
+    function entier(x) { return Math.round(x).toLocaleString(LANG === 'fr' ? 'fr-FR' : 'en-GB'); }
+    function pct(x) { return num(x * 100, x < 0.1 ? 1 : 0); }
+    function kE(x) { return num(x / 1000, x < 10000 ? 1 : 0); }
+    function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+    function couleur(nom) { return getComputedStyle(document.documentElement).getPropertyValue(nom).trim() || '#888'; }
+    function statut(m) { $('status').textContent = m || ''; }
+    function classeHM(dr) { return dr < 0.005 ? 'h0' : (dr < 0.05 ? 'h1' : (dr < 0.2 ? 'h2' : (dr < 0.6 ? 'h3' : 'h4'))); }
+
+    /* ------------------------------------------------------------ prix */
+    function nAmort(s) { return s.zeta > 0 ? 2 * Math.max(2, Math.ceil(s.FdMax / (PRIX.fUnit * 1000))) : 0; }
+    function cout(s, r) {
+        var a, m, sw;
+        if (!s.fam) { return { a: 0, m: 0, s: 0, tot: 0 }; }
+        if (s.fam === 'lrb') { a = SIM.LRB_DB[s.modele].prix * s.nL + PRIX.gliss * s.nS; }
+        else { a = PRIX['pend' + Math.round(s.course * 100)] * s.nP; }
+        m = PRIX.amort * nAmort(s);
+        var gb = geomButee(s), B = H.butee, vol = gb.cote * gb.cote * H.radierBas.ep + 4 * (gb.cote - B.muret.ep) * B.muret.ep * B.muret.h;
+        sw = PRIX.beton * vol + PRIX.vide + PRIX.pneu * 4 * s.nPneu;
+        return { a: a, m: m, s: sw, tot: a + m + sw };
+    }
+    /* Frontière et repères pour un sol */
+    function analyser(r) {
+        var l = r.solutions, i, s, front = [], drF = r.fixe.drMoy, best = drF, petit = null, rapport = null, mini = null, val;
+        for (i = 0; i < l.length; i++) { l[i].cout = cout(l[i], r).tot; }
+        var tri = l.slice().sort(function (a, b) { return (a.cout - b.cout) || (a.drMoy - b.drMoy); });
+        for (i = 0; i < tri.length; i++) {
+            s = tri[i];
+            if (s.drMoy < best - 1e-9) { best = s.drMoy; front.push(s); }
+            if (!petit && s.drMoy <= 0.5 * drF) { petit = s; }
+            val = (drF - s.drMoy) * PRIX.valeur / s.cout;
+            if (!rapport || val > rapport.val) { rapport = { s: s, val: val }; }
+            if (!mini || s.drMoy < mini.drMoy - 1e-9 || (Math.abs(s.drMoy - mini.drMoy) <= 1e-9 && s.cout < mini.cout)) { mini = s; }
+        }
+        if (!petit) { for (i = 0; i < tri.length; i++) { if (tri[i].drMoy < drF) { petit = tri[i]; break; } } }
+        var RF = H.reference, zr = r.sol === 'D' ? RF.zetaMou : RF.zeta;
+        r.ref = null;
+        for (i = 0; i < l.length; i++) {
+            s = l[i];
+            if (s.fam === 'css' && s.R === RF.R && s.course === RF.course && s.g === RF.g && Math.abs(s.zeta - zr) < 1e-9) { r.ref = s; }
+        }
+        r.front = front; r.petit = petit; r.rapport = rapport ? rapport.s : null; r.ratio = rapport ? rapport.val : 0; r.mini = mini;
+        if (!SEL[r.sol] || !trouver(r, SEL[r.sol].id)) { SEL[r.sol] = r.ref || r.rapport || mini; }
+    }
+    function trouver(r, id) { for (var i = 0; i < r.solutions.length; i++) { if (r.solutions[i].id === id) { return r.solutions[i]; } } return null; }
+
+    /* ------------------------------------------------------------ libellés */
+    function descSol(s) {
+        var d;
+        if (!s || !s.fam) { return t('c_sans'); }
+        if (s.fam === 'css') { d = fmt('d_css', { n: s.nP, R: num(s.R, 0), c: num(s.course * 100, 0) }); }
+        else {
+            d = fmt('d_lrb', { nl: s.nL, mod: s.modele });
+            if (s.nS) { d += s.nS === 1 ? t('d_gl1') : fmt('d_gl', { ns: s.nS }); }
+        }
+        d += fmt('d_grille', { g: s.g });
+        if (s.zeta > 0) { d += fmt('d_amo', { n: nAmort(s), z: num(s.zeta * 100, 0) }); }
+        return d;
+    }
+    function court(s) {
+        if (!s || !s.fam) { return t('c_sans'); }
+        var d = s.fam === 'css' ? s.nP + '× R' + num(s.R, 0) + ' ±' + num(s.course * 100, 0) : s.nL + '×' + s.modele + (s.nS ? ' + ' + s.nS + ' gl.' : '');
+        if (s.zeta > 0) { d += ' + ' + nAmort(s) + ' am.'; }
+        return d;
+    }
+    function famCol(s) { return !s.fam ? '--muted' : (s.fam === 'css' ? '--violet' : (s.nS ? '--warn' : '--orange')); }
+
+    /* ------------------------------------------------------------ hypothèses et prix */
+    function afficherHyp() {
+        var A = SIM.architecture(), l = [
+            ['h_maison', t('v_maison')], ['h_sand', t('v_sand')], ['h_rh', fmt('v_rh', { m: num(A.rad / 1000, 0) })], ['h_but', t('v_but')], ['h_chem', t('v_chem')],
+            ['h_mass', fmt('v_mass', { mb: num(A.mb / 1000, 0), mv: num(A.mv / 1000, 0), w: num(A.W / 1000, 0) })],
+            ['h_murs', fmt('v_murs', { vr: num(A.VR / 1000, 0) })], ['h_lrb', t('v_lrb')], ['h_css', t('v_css')], ['h_amo', t('v_amo')],
+            ['h_grille', t('v_grille')], ['h_tor', t('v_tor')], ['h_sei', t('v_sei')], ['h_cas', t('v_cas')], ['h_risque', t('v_risque')]
+        ], h = '', i;
+        for (i = 0; i < l.length; i++) { h += '<dt>' + esc(t(l[i][0])) + '</dt><dd>' + esc(l[i][1]) + '</dd>'; }
+        $('hyp').innerHTML = h;
+    }
+    var CHAMPS_PRIX = [['gliss', 'p_gliss'], ['pend40', 'p_pend40'], ['pend60', 'p_pend60'], ['pend80', 'p_pend80'], ['amort', 'p_amort'],
+                       ['fUnit', 'p_fUnit'], ['beton', 'p_beton'], ['vide', 'p_vide'], ['pneu', 'p_pneu'], ['valeur', 'p_valeur']];
+    function afficherPrix() {
+        var h = '', i, c, l = [], m;
+        for (i = 0; i < CHAMPS_PRIX.length; i++) {
+            c = CHAMPS_PRIX[i];
+            h += '<div><label for="px_' + c[0] + '">' + esc(t(c[1])) + '</label><input type="number" min="0" step="any" id="px_' + c[0] + '" value="' + PRIX[c[0]] + '"></div>';
+        }
+        $('prix').innerHTML = h;
+        for (m in SIM.LRB_DB) { if (SIM.LRB_DB.hasOwnProperty(m)) { l.push(m + ' ' + entier(SIM.LRB_DB[m].prix)); } }
+        $('devis').textContent = fmt('devis', { l: l.join(' · ') });
+        var ins = $('prix').querySelectorAll('input'), tm = null;
+        for (i = 0; i < ins.length; i++) {
+            ins[i].addEventListener('input', function () {
+                var v = parseFloat(this.value), cle = this.id.slice(3);
+                if (isFinite(v) && v >= 0 && !(cle === 'fUnit' && v === 0)) { PRIX[cle] = v; }
+                clearTimeout(tm);
+                tm = setTimeout(rafraichir, 120);
+            });
+        }
+    }
+    function rafraichir() {
+        var i;
+        for (i = 0; i < SOLS.length; i++) { if (RES[SOLS[i]]) { analyser(RES[SOLS[i]]); } }
+        afficherSynthese(); afficherSol();
+    }
+
+    /* ------------------------------------------------------------ synthèse */
+    function cellRep(r, s) {
+        if (!s) { return '<td>–</td>'; }
+        return '<td class="clic rep" data-sol="' + r.sol + '" data-id="' + s.id + '"><b>' + esc(court(s)) + '</b><span>' + kE(s.cout) + ' k€ · ' + pct(s.drMoy) + ' %</span></td>';
+    }
+    function afficherSynthese() {
+        var h = '<tr><th>' + t('s_sol') + '</th><th class="n">' + t('s_sans') + '</th><th>' + t('s_ref') + '</th><th>' + t('s_petit') + '</th><th>' + t('s_rapport') + '</th><th>' + t('s_min') + '</th></tr>', i, s, r;
+        for (i = 0; i < SOLS.length; i++) {
+            s = SOLS[i]; r = RES[s];
+            if (!r) { h += '<tr><td><b>' + esc(t('sol_' + s)) + '</b></td><td colspan="5" style="color:var(--muted)">' + esc(t('st_attente')) + '</td></tr>'; continue; }
+            h += '<tr' + (s === ACTIF ? ' class="sel"' : '') + '><td class="clic" data-sol="' + s + '"><b>' + esc(t('sol_' + s)) + '</b></td><td class="n">' + pct(r.fixe.drMoy) + ' %</td>' +
+                 cellRep(r, r.ref) + cellRep(r, r.petit) + cellRep(r, r.rapport) + cellRep(r, r.mini) + '</tr>';
+        }
+        $('synth').innerHTML = h;
+        var cl = $('synth').querySelectorAll('.clic');
+        for (i = 0; i < cl.length; i++) {
+            cl[i].addEventListener('click', function () {
+                var so = this.getAttribute('data-sol'), id = this.getAttribute('data-id');
+                if (id) { SEL[so] = trouver(RES[so], id); }
+                choisirSol(so);
+            });
+        }
+    }
+    function afficherOnglets() {
+        var h = '', i, s;
+        for (i = 0; i < SOLS.length; i++) { s = SOLS[i]; h += '<button type="button" class="tab' + (s === ACTIF ? ' on' : '') + '" data-sol="' + s + '">' + esc(t('sol_' + s)) + '</button>'; }
+        $('tabs').innerHTML = h;
+        var b = $('tabs').querySelectorAll('button');
+        for (i = 0; i < b.length; i++) { b[i].addEventListener('click', function () { choisirSol(this.getAttribute('data-sol')); }); }
+    }
+    function choisirSol(s) { ACTIF = s; QSEL = null; DETAIL = null; afficherOnglets(); afficherSynthese(); afficherSol(); }
+    function choisirSolution(id) { var r = RES[ACTIF]; SEL[ACTIF] = trouver(r, id); QSEL = null; DETAIL = null; afficherSol(); }
+
+    /* ------------------------------------------------------------ schémas */
+    function geomButee(s) {
+        var B = H.butee, g = s && s.fam ? s.gap : 0;
+        var demiExt = 6.5 + g + B.epPneu + B.muret.ep;
+        return { g: g, demiExt: demiExt, cote: 2 * demiExt };
+    }
+    function svgCoupe(s) {
+        var gb = geomButee(s), half = 6.5, mg = gb.demiExt + 0.4, sc = 520 / (2 * mg), W = 520, Hh = 240, i, x, d, nb = s && s.fam ? s.g : 0;
+        var yS = 178, eB = 0.30 * sc, vide = 0.8 * sc, eH = 0.45 * sc, hm = 2.8 * sc * 0.6, B = H.butee;
+        function X(x2) { return ((x2 + mg) * sc).toFixed(1); }
+        var yBas = yS - eB * 0.5, yHautBas = yBas - vide, yHaut = yHautBas - eH, yToit = yHaut - hm;
+        var o = '<svg viewBox="0 0 ' + W + ' ' + Hh + '" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, sans-serif" font-size="11">';
+        o += '<rect x="0" y="' + yS + '" width="' + W + '" height="' + (Hh - yS) + '" style="fill:var(--panel2)"/>';
+        o += '<line x1="0" y1="' + yS + '" x2="' + W + '" y2="' + yS + '" style="stroke:var(--muted)"/>';
+        /* radier bas élargi + murets */
+        o += '<rect x="' + X(-gb.demiExt) + '" y="' + yBas.toFixed(1) + '" width="' + (gb.cote * sc).toFixed(1) + '" height="' + eB.toFixed(1) + '" style="fill:var(--grid);stroke:var(--muted)"/>';
+        var hMur = B.muret.h * sc, yMur = yBas - hMur;
+        o += '<rect x="' + X(-gb.demiExt) + '" y="' + yMur.toFixed(1) + '" width="' + (B.muret.ep * sc).toFixed(1) + '" height="' + hMur.toFixed(1) + '" style="fill:var(--grid);stroke:var(--muted)"/>';
+        o += '<rect x="' + X(gb.demiExt - B.muret.ep) + '" y="' + yMur.toFixed(1) + '" width="' + (B.muret.ep * sc).toFixed(1) + '" height="' + hMur.toFixed(1) + '" style="fill:var(--grid);stroke:var(--muted)"/>';
+        if (s && s.fam) {
+            var rP = B.epPneu * sc / 2, yP = yHaut + eH / 2;
+            o += '<circle cx="' + X(-gb.demiExt + B.muret.ep + B.epPneu / 2) + '" cy="' + yP.toFixed(1) + '" r="' + rP.toFixed(1) + '" style="fill:#222;stroke:var(--muted)"/>';
+            o += '<circle cx="' + X(gb.demiExt - B.muret.ep - B.epPneu / 2) + '" cy="' + yP.toFixed(1) + '" r="' + rP.toFixed(1) + '" style="fill:#222;stroke:var(--muted)"/>';
+            o += '<line x1="' + X(half) + '" y1="' + (yHaut - 4).toFixed(1) + '" x2="' + X(half + gb.g) + '" y2="' + (yHaut - 4).toFixed(1) + '" style="stroke:var(--bad);stroke-width:1.5"/>';
+            o += '<text x="' + X(half + gb.g / 2) + '" y="' + (yHaut - 8).toFixed(1) + '" text-anchor="middle" style="fill:var(--bad)">' + esc(fmt('k_jeu', { j: num(gb.g * 100, 0) })) + '</text>';
+        }
+        o += '<text x="' + X(-half + 0.2) + '" y="' + (yBas + eB + 13).toFixed(1) + '" style="fill:var(--muted)">' + esc(t('k_bas')) + '</text>';
+        /* appuis */
+        for (i = 0; i < nb; i++) {
+            x = -half + 0.5 + (2 * half - 1) * i / (nb - 1);
+            if (s.fam === 'css') {
+                o += '<rect x="' + X(x - 0.6) + '" y="' + yHautBas.toFixed(1) + '" width="' + (1.2 * sc).toFixed(1) + '" height="5" style="fill:var(--violet)"/>';
+                o += '<rect x="' + X(x - 0.15) + '" y="' + (yHautBas + 5).toFixed(1) + '" width="' + (0.3 * sc).toFixed(1) + '" height="' + (vide - 5).toFixed(1) + '" style="fill:var(--violet);fill-opacity:.5"/>';
+            } else {
+                d = (s.fam === 'lrb' && (i === 0 || i === nb - 1 || s.motif === 'tous')) ? SIM.LRB_DB[s.modele].D : 0.3;
+                o += '<rect x="' + X(x - d / 2) + '" y="' + yHautBas.toFixed(1) + '" width="' + (d * sc).toFixed(1) + '" height="' + vide.toFixed(1) + '" style="fill:' + (d === 0.3 ? 'var(--accent2)' : 'var(--orange)') + ';fill-opacity:.85"/>';
+            }
+        }
+        if (s && s.zeta > 0) {
+            o += '<line x1="' + X(-half + 1.6) + '" y1="' + (yBas - 2).toFixed(1) + '" x2="' + X(-half + 3.6) + '" y2="' + (yHautBas + 2).toFixed(1) + '" style="stroke:var(--ok);stroke-width:5;stroke-linecap:round"/>';
+            o += '<text x="' + X(-half + 3.7) + '" y="' + (yHautBas + vide / 2 + 4).toFixed(1) + '" style="fill:var(--ok)">' + esc(t('k_amo')) + '</text>';
+        }
+        o += '<text x="' + X(half - 0.3) + '" y="' + (yHautBas + vide / 2 + 4).toFixed(1) + '" text-anchor="end" style="fill:var(--muted)">' + esc(t('k_vide')) + '</text>';
+        /* radier haut nervuré : plancher + retombées de poutres */
+        o += '<rect x="' + X(-half) + '" y="' + yHaut.toFixed(1) + '" width="' + (2 * half * sc).toFixed(1) + '" height="' + (0.25 * sc).toFixed(1) + '" style="fill:var(--accent);fill-opacity:.35;stroke:var(--accent)"/>';
+        for (i = 0; i < 3; i++) {
+            x = -half + 0.5 + (2 * half - 1) * i / 2;
+            o += '<rect x="' + X(x - 0.15) + '" y="' + yHaut.toFixed(1) + '" width="' + (0.3 * sc).toFixed(1) + '" height="' + eH.toFixed(1) + '" style="fill:var(--accent);fill-opacity:.55;stroke:var(--accent)"/>';
+        }
+        o += '<rect x="' + X(-6) + '" y="' + yToit.toFixed(1) + '" width="' + (0.2 * sc).toFixed(1) + '" height="' + hm.toFixed(1) + '" style="fill:var(--text)"/>';
+        o += '<rect x="' + X(5.8) + '" y="' + yToit.toFixed(1) + '" width="' + (0.2 * sc).toFixed(1) + '" height="' + hm.toFixed(1) + '" style="fill:var(--text)"/>';
+        o += '<path d="M' + X(-6.4) + ' ' + yToit.toFixed(1) + 'L' + X(0) + ' ' + (yToit - 30).toFixed(1) + 'L' + X(6.4) + ' ' + yToit.toFixed(1) + '" style="fill:none;stroke:var(--muted);stroke-width:2"/>';
+        o += '<text x="' + X(0) + '" y="' + (yHaut - 6).toFixed(1) + '" text-anchor="middle" style="fill:var(--accent)">' + esc(t('k_haut')) + '</text>';
+        return o + '</svg>';
+    }
+    function svgPlan(s) {
+        var gb = geomButee(s), half = 6.5, ext = gb.demiExt + 0.5, sc = 30, W = 2 * ext * sc, o, i, p, d, B = H.butee;
+        function X(x) { return ((x + ext) * sc).toFixed(1); }
+        function Y(y) { return ((ext - y) * sc).toFixed(1); }
+        function L(m) { return (m * sc).toFixed(1); }
+        function rect(x0, y0, w, h, st) { return '<rect x="' + X(x0) + '" y="' + Y(y0) + '" width="' + L(w) + '" height="' + L(h) + '" style="' + st + '"/>'; }
+        o = '<svg viewBox="0 0 ' + W.toFixed(0) + ' ' + W.toFixed(0) + '" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, sans-serif" font-size="12">';
+        if (s && s.fam) {
+            o += rect(-gb.demiExt, gb.demiExt, gb.cote, gb.cote, 'fill:var(--grid);stroke:var(--muted)');
+            var a = gb.demiExt - B.muret.ep;
+            o += rect(-a, a, 2 * a, 2 * a, 'fill:var(--bg);stroke:var(--muted)');
+            var N = s.nPneu, k2, xx, rp = B.epPneu / 2, dc = a - rp;
+            for (k2 = 0; k2 < N; k2++) {
+                xx = -half + 0.8 + (2 * half - 1.6) * (N > 1 ? k2 / (N - 1) : 0.5);
+                o += '<circle cx="' + X(xx) + '" cy="' + Y(dc) + '" r="' + L(rp) + '" style="fill:#222;stroke:var(--muted)"/>';
+                o += '<circle cx="' + X(xx) + '" cy="' + Y(-dc) + '" r="' + L(rp) + '" style="fill:#222;stroke:var(--muted)"/>';
+                o += '<circle cx="' + X(dc) + '" cy="' + Y(xx) + '" r="' + L(rp) + '" style="fill:#222;stroke:var(--muted)"/>';
+                o += '<circle cx="' + X(-dc) + '" cy="' + Y(xx) + '" r="' + L(rp) + '" style="fill:#222;stroke:var(--muted)"/>';
+            }
+        }
+        o += rect(-half, half, 2 * half, 2 * half, 'fill:var(--panel2);stroke:var(--accent);stroke-width:1.5');
+        o += rect(-6, 6, 12, 12, 'fill:none;stroke:var(--text);stroke-width:' + L(0.2) + ';stroke-opacity:.5');
+        if (s && s.fam) {
+            var pts = SIM.positions(s.g, s.motif), lig = [];
+            for (i = 0; i < s.g; i++) { lig.push(-6 + 12 * i / (s.g - 1)); }
+            for (i = 0; i < lig.length; i++) {
+                o += rect(-half, lig[i] + 0.15, 2 * half, 0.3, 'fill:var(--accent);fill-opacity:.25');
+                o += rect(lig[i] - 0.15, half, 0.3, 2 * half, 'fill:var(--accent);fill-opacity:.25');
+            }
+            for (i = 0; i < pts.length; i++) {
+                p = pts[i];
+                if (p.t === 'L') {
+                    d = SIM.LRB_DB[s.modele].D;
+                    o += '<circle cx="' + X(p.x) + '" cy="' + Y(p.y) + '" r="' + L(d / 2) + '" style="fill:var(--orange);fill-opacity:.85"/>';
+                } else if (p.t === 'S') {
+                    o += rect(p.x - 0.2, p.y + 0.2, 0.4, 0.4, 'fill:var(--accent2)');
+                } else {
+                    o += '<circle cx="' + X(p.x) + '" cy="' + Y(p.y) + '" r="' + L(0.45) + '" style="fill:none;stroke:var(--violet);stroke-width:' + L(0.1) + '"/>';
+                    o += '<circle cx="' + X(p.x) + '" cy="' + Y(p.y) + '" r="' + L(0.12) + '" style="fill:var(--violet)"/>';
+                }
+            }
+            var na = nAmort(s) / 2, yy;
+            for (k2 = 0; k2 < na; k2++) {
+                yy = (k2 % 2 === 0 ? 1 : -1) * (1.5 + 2.2 * Math.floor(k2 / 2));
+                if (Math.abs(yy) > 4.5) { yy = (yy > 0 ? 1 : -1) * 4.5; }
+                o += rect(k2 % 4 < 2 ? -5.6 : 4.4, yy + 0.12, 1.2, 0.24, 'fill:var(--ok)');
+                o += rect(yy - 0.12, k2 % 4 < 2 ? 5.6 : -4.4, 0.24, 1.2, 'fill:var(--ok)');
+            }
+            o += '<text x="' + X(half + gb.g / 2) + '" y="' + Y(0) + '" text-anchor="middle" transform="rotate(-90 ' + X(half + gb.g / 2) + ' ' + Y(0) + ')" style="fill:var(--bad)">' + esc(fmt('k_jeu', { j: num(gb.g * 100, 0) })) + '</text>';
+        }
+        o += '<path d="M' + X(-0.35) + ' ' + Y(0) + 'H' + X(0.35) + 'M' + X(0) + ' ' + Y(-0.35) + 'V' + Y(0.35) + '" style="stroke:var(--text);stroke-width:2"/>';
+        o += '<text x="' + X(0) + '" y="' + Y(half + 0.25) + '" text-anchor="middle" style="fill:var(--muted)">13 m</text>';
+        if (s && s.fam) { o += '<text x="' + X(0) + '" y="' + Y(-gb.demiExt - 0.35) + '" text-anchor="middle" style="fill:var(--muted)">' + num(gb.cote, 1) + ' m</text>'; }
+        o += '</svg><div class="legende">';
+        if (s && s.nL) { o += '<span><i style="background:var(--orange);border-radius:50%"></i>' + esc(t('k_lrb')) + '</span>'; }
+        if (s && s.nS) { o += '<span><i style="background:var(--accent2)"></i>' + esc(t('k_gl')) + '</span>'; }
+        if (s && s.nP) { o += '<span><i style="border:3px solid var(--violet);border-radius:50%"></i>' + esc(t('k_pend')) + '</span>'; }
+        if (s && s.fam) { o += '<span><i style="background:var(--accent);opacity:.4"></i>' + esc(t('k_poutre')) + '</span>'; }
+        if (s && s.zeta > 0) { o += '<span><i style="background:var(--ok)"></i>' + esc(t('k_amo')) + '</span>'; }
+        if (s && s.fam) { o += '<span><i style="background:#222;border-radius:50%"></i>' + esc(fmt('k_pneus', { n: s.nPneu })) + '</span><span><i style="background:var(--grid);border:1px solid var(--muted)"></i>' + esc(t('k_muret')) + '</span>'; }
+        o += '<span>✚ ' + esc(t('k_cm')) + '</span>';
+        return o + '</div>';
+    }
+
+    /* ------------------------------------------------------------ panneau sol */
+    function afficherSol() {
+        var r = RES[ACTIF], z = $('panneauSol'), h = '', i, s, c, f;
+        if (!r) { z.innerHTML = '<div class="card vide">' + esc(t('vide')) + '</div>'; return; }
+        s = SEL[ACTIF]; c = cout(s, r);
+        h += '<div class="card"><h2>' + esc(fmt('sec_nuage', { s: t('sol_' + ACTIF) })) + '</h2><canvas id="cv_nuage"></canvas>' +
+             '<div class="legende"><span><i style="background:var(--muted);border-radius:50%"></i>' + esc(t('lg_fixe')) + '</span>' +
+             '<span><i style="background:var(--orange);border-radius:50%"></i>' + esc(t('lg_lrb')) + '</span>' +
+             '<span><i style="background:var(--warn);border-radius:50%"></i>' + esc(t('lg_lrbs')) + '</span>' +
+             '<span><i style="background:var(--violet);border-radius:50%"></i>' + esc(t('lg_css')) + '</span>' +
+             '<span>◎ ' + esc(t('lg_amo')) + '</span><span><i style="background:var(--accent);height:3px"></i>' + esc(t('lg_front')) + '</span></div>' +
+             '<div class="note">' + esc(t('nuage_note')) + '</div></div>';
+
+        h += '<div class="card"><h2>' + esc(t('sec_sel')) + '</h2><div class="titre-sel">' + esc(descSol(s)) + '</div>' +
+             '<div class="ventil">' + esc(fmt('ventil', { a: entier(c.a), m: entier(c.m), s: entier(c.s) })) + '</div><div class="tiles">' +
+             '<div class="tile hl"><b>' + pct(s.drMoy) + ' %</b><span>' + esc(t('t_cas')) + ' (' + esc(t('s_sans').toLowerCase()) + ' ' + pct(r.fixe.drMoy) + ' %)</span></div>' +
+             '<div class="tile hl"><b>' + entier(c.tot) + '</b><span>' + esc(t('t_cout')) + '</span></div>' +
+             '<div class="tile"><b>' + num((r.fixe.drMoy - s.drMoy) * PRIX.valeur / c.tot, 1) + '</b><span>' + esc(t('t_evite')) + '</span></div>' +
+             '<div class="tile"><b>' + s.nOK + ' / ' + r.nq + '</b><span>' + esc(t('t_ok')) + '</span></div>' +
+             '<div class="tile"><b>' + s.nRupt + '</b><span>' + esc(t('t_rupt')) + '</span></div>' +
+             '<div class="tile"><b>' + num(s.gap * 100, 0) + '</b><span>' + esc(t('t_jeu')) + '</span></div>' +
+             '<div class="tile"><b>' + (4 * s.nPneu) + '</b><span>' + esc(t('t_pneus')) + '</span></div>' +
+             '<div class="tile"><b>' + s.nChoc + '</b><span>' + esc(t('t_choc')) + '</span></div>' +
+             (s.drMoy0 !== undefined ? '<div class="tile"><b>' + pct(s.drMoy0) + ' %</b><span>' + esc(t('t_sansp')) + '</span></div>' +
+                 '<div class="tile hl"><b>' + num((s.drMoy0 - s.drMoy) * 100, 1) + '</b><span>' + esc(t('t_gainp')) + '</span></div>' : '') +
+             '<div class="tile"><b>' + num(s.EiMax / 1000, 0) + '</b><span>' + esc(t('t_ei')) + '</span></div>' +
+             '<div class="tile"><b>' + nAmort(s) + '</b><span>' + esc(t('t_amo')) + '</span></div></div>';
+        h += '<div class="duo"><div class="schema"><h3>' + esc(t('sec_coupe')) + '</h3>' + svgCoupe(s) + '<h3>' + esc(t('sec_plan')) + '</h3><div class="plan">' + svgPlan(s) + '</div></div>';
+        h += '<div><h3>' + esc(t('sec_hm')) + '</h3><div class="tablewrap"><table class="hm"><tr><th>' + esc(t('c_q')) + '</th><th class="n">' + esc(t('c_m')) +
+             '</th><th class="n">' + esc(t('c_pga')) + '</th><th class="c">' + esc(t('c_sans')) + '</th><th class="c">' + esc(t('c_sansp')) + '</th><th class="c">' + esc(t('c_avecp')) +
+             '</th><th class="n">' + esc(t('c_pneus')) + '</th></tr>';
+        var capP = s.nPneu * H.butee.E1, d0;
+        for (i = 0; i < r.nq; i++) {
+            h += '<tr class="clic' + (i === QSEL ? ' sel' : '') + '" data-q="' + i + '"><td>' + esc(Q[i].nom) + (Q[i].est ? ' *' : '') + '</td><td class="n">' + num(Q[i].mag, 1) +
+                 '</td><td class="n">' + num(Q[i].pga, 2) + '</td><td class="c ' + classeHM(r.fixe.q.DR[i]) + '">' + pct(r.fixe.q.DR[i]) + '</td>';
+            d0 = s.q.DR0 ? s.q.DR0[i] : null;
+            h += d0 === null ? '<td class="c">–</td>' : '<td class="c ' + classeHM(d0) + '">' + pct(d0) + (s.q.rupt0[i] ? '<sup>R</sup>' : '') + '</td>';
+            h += '<td class="c ' + classeHM(s.q.DR[i]) + '" title="a = ' + num(s.q.acc[i], 2) + ' g · d = ' + num(s.q.dc[i] * 1000, 0) + ' mm">' +
+                 pct(s.q.DR[i]) + (s.q.rupt[i] ? '<sup>R</sup>' : (s.q.choc[i] ? '<sup>B</sup>' : '')) + '</td>';
+            h += '<td class="n">' + (s.q.choc[i] ? num(s.q.Ei[i] / 1000, 0) + ' kJ (' + num(Math.min(999, s.q.Ei[i] / capP * 100), 0) + ' %)' : '–') + '</td></tr>';
+        }
+        h += '</table></div><div class="note">' + esc(t('hm_note3')) + '</div></div></div></div>';
+
+        h += '<div class="card"><h3 id="detTitre">' + esc(QSEL === null ? t('det_aide') : fmt('sec_det', { q: Q[QSEL].nom })) + '</h3><div class="note" id="detCause" style="display:none"></div><div class="charts">' +
+             '<div><h3>' + esc(t('ch_acc')) + '</h3><canvas id="cv_acc"></canvas></div><div><h3>' + esc(t('ch_iso')) + '</h3><canvas id="cv_iso"></canvas></div></div></div>';
+
+        h += '<div class="card"><h3>' + esc(fmt('sec_front', { n: r.front.length, t: r.solutions.length })) + '</h3><div class="tablewrap"><table><tr><th>' + t('tp_conf') +
+             '</th><th class="n">' + t('tp_cout') + '</th><th class="n">' + t('tp_cas') + '</th><th class="n">' + t('tp_ok') + '</th><th class="n">' + t('tp_rupt') + '</th><th class="n">' + t('tp_choc') + '</th></tr>';
+        for (i = 0; i < r.front.length; i++) {
+            f = r.front[i];
+            h += '<tr class="clic' + (f.id === s.id ? ' sel' : '') + '" data-id="' + f.id + '"><td>' + esc(descSol(f)) +
+                 (f === r.petit ? ' <b style="color:var(--accent)">· ' + esc(t('r_petit')) + '</b>' : '') +
+                 (f === r.rapport ? ' <b style="color:var(--ok)">· ' + esc(t('r_rapport')) + '</b>' : '') +
+                 (f === r.mini ? ' <b style="color:var(--orange)">· ' + esc(t('r_min')) + '</b>' : '') +
+                 (f === r.ref ? ' <b style="color:var(--violet)">· ' + esc(t('r_ref')) + '</b>' : '') +
+                 '</td><td class="n">' + entier(f.cout) + '</td><td class="n">' + pct(f.drMoy) + '</td><td class="n">' + f.nOK + '</td><td class="n">' + f.nRupt + '</td><td class="n">' + f.nChoc + '</td></tr>';
+        }
+        h += '</table></div></div>';
+        z.innerHTML = h;
+
+        var rows = z.querySelectorAll('table.hm tr.clic');
+        for (i = 0; i < rows.length; i++) { rows[i].addEventListener('click', function () { choisirSeisme(parseInt(this.getAttribute('data-q'), 10)); }); }
+        rows = z.querySelectorAll('tr.clic[data-id]');
+        for (i = 0; i < rows.length; i++) { rows[i].addEventListener('click', function () { choisirSolution(this.getAttribute('data-id')); }); }
+        $('cv_nuage').addEventListener('click', cliquerNuage);
+        dessinerNuage();
+        if (QSEL !== null && !DETAIL) { DETAIL = SIM.detail(ACTIF, QSEL, s); }
+        dessinerDetail();
+        afficherCause();
+    }
+    function choisirSeisme(qi) {
+        var rows = document.querySelectorAll('table.hm tr.clic'), i;
+        for (i = 0; i < rows.length; i++) { rows[i].classList.toggle('sel', parseInt(rows[i].getAttribute('data-q'), 10) === qi); }
+        QSEL = qi;
+        $('detTitre').textContent = fmt('sec_det', { q: Q[qi].nom });
+        DETAIL = SIM.detail(ACTIF, qi, SEL[ACTIF]);
+        dessinerDetail();
+        afficherCause();
+    }
+
+    function afficherCause() {
+        var z = $('detCause'), s = SEL[ACTIF], q, o;
+        if (!z || QSEL === null || !s) { return; }
+        q = s.q;
+        o = { x: pct(q.DR[QSEL]), a: num(q.acc[QSEL], 2), d: num(q.dc[QSEL] * 1000, 0), c: num(s.cap * 1000, 0) };
+        o.e = num(q.Ei[QSEL] / 1000, 0); o.f = num(q.Fb[QSEL] / 1000, 0);
+        z.textContent = (q.rupt[QSEL] ? fmt('cause_rupt2', o) : (q.choc[QSEL] ? fmt('cause_choc', o) : (q.DR[QSEL] >= 0.005 ? fmt('cause_acc', o) : fmt('cause_ok', o)))) +
+                        (q.DR0 && q.choc[QSEL] ? fmt('cause_sansp', { x0: pct(q.DR0[QSEL]) }) : '');
+        z.style.display = 'block';
+        z.style.borderColor = q.DR[QSEL] >= 0.2 ? 'var(--bad)' : (q.DR[QSEL] >= 0.005 ? 'var(--warn)' : 'var(--ok)');
+    }
+
+    /* ------------------------------------------------------------ nuage prix / risque */
+    function pasNet(etendue, n) {
+        var brut = etendue / Math.max(n, 1), p = Math.pow(10, Math.floor(Math.log(brut) / Math.LN10)), f = brut / p;
+        return (f < 1.5 ? 1 : (f < 3 ? 2 : (f < 7 ? 5 : 10))) * p;
+    }
+    function decimales(pas) { return Math.max(0, Math.min(4, -Math.floor(Math.log(pas) / Math.LN10 + 1e-9))); }
+    function preparerCanvas(cv) {
+        var dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight, c;
+        if (!W || !H) { return null; }
+        cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+        c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0);
+        c.fillStyle = couleur('--bg'); c.fillRect(0, 0, W, H);
+        c.font = '11px system-ui, sans-serif';
+        return { c: c, W: W, H: H };
+    }
+    function axes(c, mL, mT, pw, ph, x0, x1, y0, y1, xl, yl, H) {
+        var px = pasNet(x1 - x0, pw / 90), py = pasNet(y1 - y0, ph / 40), dX = decimales(px), dY = decimales(py), v, z;
+        var X = function (v2) { return mL + (v2 - x0) / (x1 - x0) * pw; }, Y = function (v2) { return mT + (y1 - v2) / (y1 - y0) * ph; };
+        c.lineWidth = 1; c.strokeStyle = couleur('--grid'); c.fillStyle = couleur('--muted'); c.textAlign = 'center'; c.textBaseline = 'top';
+        for (v = Math.ceil(x0 / px) * px; v <= x1 + 1e-9; v += px) { z = Math.round(X(v)) + 0.5; c.beginPath(); c.moveTo(z, mT); c.lineTo(z, mT + ph); c.stroke(); c.fillText(num(v, dX), z, mT + ph + 4); }
+        c.textAlign = 'right'; c.textBaseline = 'middle';
+        for (v = Math.ceil(y0 / py) * py; v <= y1 + 1e-9; v += py) { z = Math.round(Y(v)) + 0.5; c.beginPath(); c.moveTo(mL, z); c.lineTo(mL + pw, z); c.stroke(); c.fillText(num(v, dY), mL - 6, z); }
+        c.strokeStyle = couleur('--border'); c.strokeRect(mL + 0.5, mT + 0.5, pw, ph);
+        c.textAlign = 'center'; c.textBaseline = 'bottom'; c.fillText(xl, mL + pw / 2, H - 2);
+        c.save(); c.translate(11, mT + ph / 2); c.rotate(-Math.PI / 2); c.textBaseline = 'middle'; c.fillText(yl, 0, 0); c.restore();
+        return { X: X, Y: Y };
+    }
+    function dessinerNuage() {
+        var r = RES[ACTIF], cv = $('cv_nuage'), P = cv ? preparerCanvas(cv) : null, i, s, x1 = 0, y1 = 0, xy;
+        if (!P || !r) { return; }
+        var c = P.c, mL = 54, mR = 16, mT = 14, mB = 36, pw = P.W - mL - mR, ph = P.H - mT - mB, l = r.solutions;
+        for (i = 0; i < l.length; i++) { if (l[i].cout > x1) { x1 = l[i].cout; } if (l[i].drMoy > y1) { y1 = l[i].drMoy; } }
+        if (r.fixe.drMoy > y1) { y1 = r.fixe.drMoy; }
+        x1 = x1 / 1000 * 1.04; y1 = Math.min(100, y1 * 100 * 1.06);
+        var A = axes(c, mL, mT, pw, ph, 0, x1, 0, y1, t('ax_cout'), t('ax_cas'), P.H);
+        POINTS = [];
+        function pt(s2) { return [A.X(s2.cout / 1000), A.Y(s2.drMoy * 100)]; }
+        for (i = 0; i < l.length; i++) {
+            s = l[i]; xy = pt(s);
+            c.fillStyle = couleur(famCol(s)); c.globalAlpha = 0.75;
+            c.beginPath(); c.arc(xy[0], xy[1], 3.2, 0, 2 * Math.PI); c.fill();
+            if (s.zeta > 0) { c.strokeStyle = c.fillStyle; c.lineWidth = 1; c.beginPath(); c.arc(xy[0], xy[1], 3 + 6 * s.zeta, 0, 2 * Math.PI); c.stroke(); }
+            c.globalAlpha = 1;
+            POINTS.push({ x: xy[0], y: xy[1], id: s.id });
+        }
+        xy = [A.X(0), A.Y(r.fixe.drMoy * 100)];
+        c.fillStyle = couleur('--muted'); c.beginPath(); c.arc(xy[0], xy[1], 6, 0, 2 * Math.PI); c.fill();
+        c.textAlign = 'left'; c.textBaseline = 'middle'; c.fillText(t('lg_fixe'), xy[0] + 9, xy[1]);
+        c.strokeStyle = couleur('--accent'); c.lineWidth = 2; c.beginPath(); c.moveTo(xy[0], xy[1]);
+        for (i = 0; i < r.front.length; i++) { xy = pt(r.front[i]); c.lineTo(xy[0], xy[1]); }
+        c.stroke();
+        function repere(s2, lab, col, dy) {
+            if (!s2) { return; }
+            var p = pt(s2), w;
+            c.strokeStyle = couleur(col); c.lineWidth = 2; c.beginPath(); c.arc(p[0], p[1], 9, 0, 2 * Math.PI); c.stroke();
+            c.font = '600 11px system-ui, sans-serif'; w = c.measureText(lab).width;
+            var tx = Math.min(p[0] + 12, mL + pw - w - 6), ty = Math.max(mT + 8, Math.min(mT + ph - 8, p[1] + dy));
+            c.fillStyle = couleur('--panel'); c.globalAlpha = 0.9; c.fillRect(tx - 3, ty - 8, w + 6, 16); c.globalAlpha = 1;
+            c.fillStyle = couleur(col); c.textAlign = 'left'; c.textBaseline = 'middle'; c.fillText(lab, tx, ty);
+            c.font = '11px system-ui, sans-serif';
+        }
+        repere(r.petit, t('r_petit'), '--accent', -16);
+        repere(r.rapport, t('r_rapport'), '--ok', 16);
+        repere(r.mini, t('r_min'), '--orange', -16);
+        repere(r.ref, t('r_ref'), '--violet', 30);
+        s = SEL[ACTIF];
+        if (s) { xy = pt(s); c.strokeStyle = couleur('--text'); c.lineWidth = 2.5; c.beginPath(); c.arc(xy[0], xy[1], 13, 0, 2 * Math.PI); c.stroke(); }
+    }
+    function cliquerNuage(ev) {
+        var b = this.getBoundingClientRect(), x = ev.clientX - b.left, y = ev.clientY - b.top, i, d, best = null, bd = 100;
+        for (i = 0; i < POINTS.length; i++) { d = (POINTS[i].x - x) * (POINTS[i].x - x) + (POINTS[i].y - y) * (POINTS[i].y - y); if (d < bd) { bd = d; best = POINTS[i]; } }
+        if (best) { choisirSolution(best.id); }
+    }
+
+    /* ------------------------------------------------------------ historiques */
+    function tracer(cv, o) {
+        var P = preparerCanvas(cv), i, k2, s, n, yv, sy, m, y0 = Infinity, y1 = -Infinity, x1 = 0;
+        if (!P) { return; }
+        var c = P.c, series = o.series || [], hl = o.hl || [];
+        if (!series.length) { c.fillStyle = couleur('--muted'); c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(t('vide'), P.W / 2, P.H / 2); return; }
+        var mL = 58, mR = 12, mT = 26, mB = 34, pw = P.W - mL - mR, ph = P.H - mT - mB;
+        for (i = 0; i < series.length; i++) {
+            s = series[i]; n = s.y.length; sy = s.sy || 1;
+            if ((n - 1) * s.dx > x1) { x1 = (n - 1) * s.dx; }
+            for (k2 = 0; k2 < n; k2++) { yv = s.y[k2] * sy; if (yv < y0) { y0 = yv; } if (yv > y1) { y1 = yv; } }
+        }
+        for (i = 0; i < hl.length; i++) { if (hl[i].y < y0) { y0 = hl[i].y; } if (hl[i].y > y1) { y1 = hl[i].y; } }
+        m = Math.max(Math.abs(y0), Math.abs(y1)) * 1.06 || 1; y0 = -m; y1 = m;
+        var A = axes(c, mL, mT, pw, ph, 0, x1 || 1, y0, y1, o.xl, o.yl, P.H);
+        c.save(); c.beginPath(); c.rect(mL, mT, pw, ph); c.clip();
+        for (i = 0; i < series.length; i++) {
+            s = series[i]; n = s.y.length; sy = s.sy || 1;
+            if (o.enveloppe) { enveloppe(c, s, A, pw, n, sy); continue; }
+            c.strokeStyle = couleur(s.col); c.lineWidth = s.w || 1.3; c.beginPath();
+            var cols = Math.ceil(pw), col, ka, kb, mn, mx, xp, premier = true;
+            for (col = 0; col < cols; col++) {
+                ka = Math.floor(col * n / cols); kb = Math.min(n, Math.floor((col + 1) * n / cols));
+                if (kb <= ka) { continue; }
+                mn = Infinity; mx = -Infinity;
+                for (k2 = ka; k2 < kb; k2++) { yv = s.y[k2] * sy; if (yv < mn) { mn = yv; } if (yv > mx) { mx = yv; } }
+                xp = A.X(ka * s.dx);
+                if (premier) { c.moveTo(xp, A.Y(mn)); premier = false; } else { c.lineTo(xp, A.Y(mn)); }
+                c.lineTo(xp, A.Y(mx));
+            }
+            c.stroke();
+        }
+        for (i = 0; i < hl.length; i++) { c.strokeStyle = couleur(hl[i].col); c.lineWidth = 1.5; c.setLineDash([6, 4]); c.beginPath(); c.moveTo(mL, A.Y(hl[i].y)); c.lineTo(mL + pw, A.Y(hl[i].y)); c.stroke(); }
+        c.setLineDash([]);
+        c.restore();
+        var lx = mL + 4, items = [], it;
+        for (i = 0; i < series.length; i++) { if (series[i].lab) { items.push({ col: series[i].col, lab: series[i].lab, d: false }); } }
+        for (i = 0; i < hl.length; i++) { if (hl[i].lab) { items.push({ col: hl[i].col, lab: hl[i].lab, d: true }); } }
+        c.textAlign = 'left'; c.textBaseline = 'middle';
+        for (i = 0; i < items.length; i++) {
+            it = items[i];
+            c.strokeStyle = couleur(it.col); c.lineWidth = 2; c.setLineDash(it.d ? [6, 4] : []);
+            c.beginPath(); c.moveTo(lx, 12); c.lineTo(lx + 16, 12); c.stroke(); c.setLineDash([]);
+            c.fillStyle = couleur('--muted'); c.fillText(it.lab, lx + 20, 12);
+            lx += 30 + c.measureText(it.lab).width;
+        }
+    }
+    /* Enveloppe crête : max |y| glissant sur ±0,25 s, bande pleine symétrique */
+    function enveloppe(c, s, A, pw, n, sy) {
+        var cols = Math.ceil(pw), e = [], f = [], col, ka, kb, k2, m, w, j, x;
+        for (col = 0; col < cols; col++) {
+            ka = Math.floor(col * n / cols); kb = Math.min(n, Math.floor((col + 1) * n / cols)); m = 0;
+            for (k2 = ka; k2 < kb; k2++) { x = Math.abs(s.y[k2] * sy); if (x > m) { m = x; } }
+            e.push(m);
+        }
+        w = Math.max(1, Math.round(0.25 / (s.dx * n / cols)));
+        for (col = 0; col < cols; col++) {
+            m = 0;
+            for (j = Math.max(0, col - w); j <= Math.min(cols - 1, col + w); j++) { if (e[j] > m) { m = e[j]; } }
+            f.push(m);
+        }
+        c.beginPath();
+        for (col = 0; col < cols; col++) { x = A.X(col * n / cols * s.dx); if (col === 0) { c.moveTo(x, A.Y(f[col])); } else { c.lineTo(x, A.Y(f[col])); } }
+        for (col = cols - 1; col >= 0; col--) { c.lineTo(A.X(col * n / cols * s.dx), A.Y(-f[col])); }
+        c.closePath();
+        c.fillStyle = couleur(s.col); c.globalAlpha = s.alpha || 0.5; c.fill();
+        c.globalAlpha = 1; c.strokeStyle = couleur(s.col); c.lineWidth = 1; c.stroke();
+    }
+    function dessinerDetail() {
+        var cA = $('cv_acc'), cI = $('cv_iso');
+        if (!cA) { return; }
+        if (!DETAIL) { tracer(cA, {}); tracer(cI, {}); return; }
+        var d = DETAIL, cap = d.cap * 1000;
+        tracer(cA, { xl: t('ax_t'), yl: t('ax_acc'), enveloppe: true, series: [
+            { y: d.fixe.acc, dx: d.dt, sy: 1 / G, col: '--muted', lab: t('lg_sans'), alpha: 0.35 },
+            { y: d.iso.acc, dx: d.dt, sy: 1 / G, col: '--accent', lab: t('lg_sel'), alpha: 0.8 }],
+            hl: [{ y: 0.25, col: '--warn', lab: t('lg_scont') }, { y: -0.25, col: '--warn' },
+                 { y: 0.6, col: '--bad', lab: t('lg_smurs') }, { y: -0.6, col: '--bad' }] });
+        tracer(cI, { xl: t('ax_t'), yl: t('ax_mm'), series: [
+            { y: d.iso.ub, dx: d.dt, sy: 1000, col: '--accent', lab: t('lg_centre'), w: 1 },
+            { y: d.iso.ub, dx: d.dt, sy: 1000 * d.delta, col: '--orange', lab: t('lg_angle'), w: 1.2 }],
+            hl: [{ y: d.gap * 1000, col: '--warn', lab: t('lg_but') }, { y: -d.gap * 1000, col: '--warn' }, { y: cap, col: '--bad', lab: t('lg_course') }, { y: -cap, col: '--bad' }] });
+    }
+
+    /* ------------------------------------------------------------ calcul parallèle */
+    var SRC_WORKER = null;
+    function sourceWorker() {
+        if (!SRC_WORKER) {
+            SRC_WORKER = URL.createObjectURL(new Blob([$('noyau').textContent +
+                '\nself.onmessage = function (e) { try { var o = SIM.optimiseur(e.data.sol), d = 0; while (!o.fini) { o.step();' +
+                ' var n = Date.now(); if (n - d > 200) { d = n; self.postMessage({ type: "prog", p: o.progres }); } }' +
+                ' self.postMessage({ type: "fin", res: o.resultat }); } catch (x) { self.postMessage({ type: "err", err: String((x && x.message) || x) }); } };'],
+                { type: 'text/javascript' }));
+        }
+        return SRC_WORKER;
+    }
+    function calculLocal(sol, cb) {
+        var o;
+        try { o = SIM.optimiseur(sol); } catch (x) { cb({ type: 'err', err: String(x.message || x) }); return; }
+        (function tranche() {
+            var d = Date.now();
+            try { while (!o.fini && Date.now() - d < 40) { o.step(); } } catch (x) { cb({ type: 'err', err: String(x.message || x) }); return; }
+            if (o.fini) { cb({ type: 'fin', res: o.resultat }); return; }
+            cb({ type: 'prog', p: o.progres });
+            setTimeout(tranche, 0);
+        })();
+    }
+    function calculWorker(sol, cb, echec) {
+        var w;
+        try { w = new Worker(sourceWorker()); } catch (x) { echec(); return; }
+        w.onmessage = function (e) { if (e.data.type !== 'prog') { w.terminate(); } cb(e.data); };
+        w.onerror = function (ev) { if (ev && ev.preventDefault) { ev.preventDefault(); } w.terminate(); echec(); };
+        w.postMessage({ sol: sol });
+    }
+    function lancer() {
+        if (OCCUPE) { return; }
+        OCCUPE = true; $('btnRun').disabled = true; RES = {}; T0 = Date.now(); DUREE = null;
+        afficherSynthese(); afficherSol();
+        var prog = {}, restants = SOLS.length, local = [], enLocal = false, i;
+        function maj() {
+            var s = 0, j;
+            for (j = 0; j < SOLS.length; j++) { s += prog[SOLS[j]] || 0; }
+            $('progBar').style.width = (s / SOLS.length * 100).toFixed(1) + '%';
+            statut(fmt('st_calc', { p: num(s / SOLS.length * 100, 0) }));
+        }
+        function fin(sol) {
+            return function (m) {
+                if (m.type === 'prog') { prog[sol] = m.p; maj(); return; }
+                if (m.type === 'err') { OCCUPE = false; $('btnRun').disabled = false; statut(t('st_err') + m.err); return; }
+                prog[sol] = 1; RES[sol] = m.res; analyser(m.res); maj();
+                afficherSynthese();
+                if (sol === ACTIF) { afficherSol(); }
+                restants--;
+                if (restants === 0) {
+                    OCCUPE = false; $('btnRun').disabled = false; DUREE = (Date.now() - T0) / 1000;
+                    statut(fmt('st_fini', { s: num(DUREE, 0) }));
+                } else if (enLocal && local.length) { var sv = local.shift(); calculLocal(sv, fin(sv)); }
+            };
+        }
+        function echec(sol) {
+            return function () {
+                local.push(sol);
+                if (!enLocal) { enLocal = true; var sv = local.shift(); calculLocal(sv, fin(sv)); }
+            };
+        }
+        for (i = 0; i < SOLS.length; i++) { calculWorker(SOLS[i], fin(SOLS[i]), echec(SOLS[i])); }
+    }
+
+    /* ------------------------------------------------------------ init */
+    function appliquerTrad() {
+        var els = document.querySelectorAll('[data-i18n]'), i, k2;
+        document.documentElement.lang = LANG;
+        for (i = 0; i < els.length; i++) { k2 = els[i].getAttribute('data-i18n'); if (T[LANG][k2] !== undefined) { els[i].textContent = T[LANG][k2]; } }
+        document.title = t('titre_page');
+        $('btnLang').textContent = LANG === 'fr' ? 'EN' : 'FR';
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+        var minuteur = null;
+        appliquerTrad(); afficherHyp(); afficherPrix(); afficherOnglets(); afficherSynthese(); afficherSol();
+        $('btnRun').addEventListener('click', lancer);
+        $('btnLang').addEventListener('click', function () {
+            LANG = LANG === 'fr' ? 'en' : 'fr';
+            appliquerTrad(); afficherHyp(); afficherPrix(); afficherOnglets(); afficherSynthese(); afficherSol();
+            if (DUREE !== null) { statut(fmt('st_fini', { s: num(DUREE, 0) })); }
+        });
+        $('btnTheme').addEventListener('click', function () {
+            var root = document.documentElement, cur = root.getAttribute('data-theme');
+            if (!cur) { cur = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'; }
+            root.setAttribute('data-theme', cur === 'light' ? 'dark' : 'light');
+            dessinerNuage(); dessinerDetail();
+        });
+        window.addEventListener('resize', function () { clearTimeout(minuteur); minuteur = setTimeout(function () { dessinerNuage(); dessinerDetail(); }, 120); });
+        lancer();
+    });
+})();
+</script>
+</body>
+</html>
