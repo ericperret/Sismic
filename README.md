@@ -1,89 +1,101 @@
 <!--
-  Nom      : README.md
-  Objet    : Présentation du simulateur d'isolation sismique (dépôt GitHub)
-  Auteur   : Eric PERRET — assistance Claude (Anthropic)
-  Date     : 2026-10-08
-  Version  : 15.1
-  Licence  : CC BY-NC 4.0 — usage commercial interdit sans accord écrit de l'auteur
+  Name     : README.md
+  Purpose  : Overview of the seismic isolation simulator (GitHub repository)
+  Author   : Eric PERRET — assisted by Claude (Anthropic)
+  Date     : 2026-10-17
+  Version  : 15.2
+  License  : CC BY-NC 4.0 — commercial use forbidden without the author's written consent
 -->
 
-# Simulateur d'isolation sismique — maison de plain-pied
+# Seismic isolation simulator — single-storey house
 
-Outil autonome (un seul fichier HTML) d'aide au choix de l'isolation sismique d'une maison de plain-pied de 12 × 12 m.
-Il compare des centaines de configurations d'appuis sur 21 séismes de référence et 4 classes de sol, et trace la **courbe prix / risque** pour aider à choisir.
+🇫🇷 [Version française : LISEZMOI.md](LISEZMOI.md)
 
-## Utilisation
+▶️ **[Launch the simulator](https://ericperret.github.io/Sismic/simulateur_sismique.html)** — the computation starts by itself on load.
 
-1. Télécharger `simulateur_sismique_v15.html`.
-2. L'ouvrir dans un navigateur récent (Firefox, Chrome, Edge).
-3. Le calcul démarre seul (≈ 1 min 30, calcul parallèle sur 4 cœurs).
+![Seismic isolation simulator v15.2](screenshot_en.png)
 
-Aucune installation, aucune librairie, aucune connexion requise.
-Les prix sont modifiables dans l'en-tête : la courbe se met à jour instantanément, sans relancer le calcul.
+A standalone tool (one single HTML file) to help choose the seismic isolation of a 12 × 12 m single-storey house.
+It compares hundreds of bearing configurations against 21 reference earthquakes and 4 soil classes, and plots the **price / risk curve** to support the choice.
 
-## Ce que l'outil affiche
+## Usage
 
-- **Synthèse par terrain** (rocher, sol ferme, sol moyen, sol mou) : sans isolation, système de référence, petit budget, meilleur rapport, casse minimale.
-- **Nuage prix / risque** : chaque point est une configuration ; la ligne relie les meilleurs compromis. Un clic sur un point affiche le détail.
-- **Configuration sélectionnée** : coût détaillé, coupe et plan du sandwich, appuis, amortisseurs, butées.
-- **Casse par séisme** : sans isolation, sans pneus, avec pneus, énergie absorbée par les butées.
-- **Historique d'un séisme** : accélération de la maison (enveloppes et seuils de casse), déplacement des appuis (jeu, course), cause de la casse.
+1. Open the link above, or download `simulateur_sismique.html` and open it in a recent browser (Firefox, Chrome, Edge).
+2. The computation starts by itself (≈ 1 min 30, parallel computation on 4 cores).
 
-## Modèle de construction
+No installation, no library, no network connection required.
+Prices can be edited in the header: the curve updates instantly, without re-running the computation.
 
-| Élément | Description |
+## Features
+
+| Feature | Description |
 |---|---|
-| Maison | plain-pied 12 × 12 m, parpaing chaîné, tôle sur charpente |
-| Radier bas | béton armé 30 cm coulé au sol, élargi pour porter le muret de butée |
-| Vide technique | 0,8 m, ventilé, appuis et amortisseurs |
-| Appuis | pendules à friction (R 3 à 6 m, course 40 / 60 / 80 cm) ou LRB D400 à D1000, seuls ou avec appuis glissants |
-| Amortisseurs | visqueux, 0 à 30 % d'amortissement, nombre selon l'effort |
-| Radier haut | nervuré : 6 poutres BA 30 × 50 + poutrelles-hourdis 20+5 (≈ 80 t) |
-| Butées | muret BA périphérique + pneus de poids lourd posés à plat |
+| Summary by soil | Rock, stiff soil, medium soil, soft soil: no isolation, reference system, small budget, best value, minimum damage |
+| Price / risk scatter | Each point is a configuration; the line joins the best trade-offs; clicking a point shows its details |
+| Selected configuration | Detailed cost, section and plan of the sandwich foundation, bearings, dampers, end stops |
+| Damage per earthquake | No isolation, without tyres, with tyres, energy absorbed by the end stops |
+| Earthquake time history | House acceleration (envelopes and damage thresholds), bearing displacement (gap, stroke), cause of damage |
+| Editable prices | Accessories, concrete, tyres, house value: curve recomputed without re-running the simulation |
+| Interface | French / English (browser language detected, FR / EN button), light and dark themes |
 
-**Système de référence** : 9 pendules à friction R = 4 m, course ±80 cm, grille 3 × 3, amortisseurs 20 % (30 % en sol mou), butées en pneus.
+## Construction model
 
-## Méthode
-
-- Intégration temporelle Newmark-β (accélération moyenne) avec Newton-Raphson exact par branche.
-- Appuis : modèle bilinéaire hystérétique à écrouissage cinématique (LRB, pendules, glissants).
-- Butées : contact non linéaire de Hunt-Crossley.
-- Séismes : accélérogrammes artificiels compatibles avec le spectre Eurocode 8 type 1 de chaque sol, calés sur le PGA enregistré.
-- Torsion : excentricité accidentelle de 5 % (EC8), contrôle à l'appui d'angle.
-- Casse : murs (cisaillement et hors plan), contenus (seuils d'accélération type HAZUS), rupture si les butées sont écrasées.
-- Risque : casse moyenne sur les 21 séismes, en % de la valeur de la maison.
-
-## Séismes de référence
-
-Kobe 1995, Tōhoku 2011, Niigata 2004, Kumamoto 2016, Northridge 1994, Loma Prieta 1989, San Fernando 1971, Alaska 1964, Christchurch 2011, Kaikōura 2016, Chi-Chi 1999, Maule 2010, Valdivia 1960, L'Aquila 2009, Amatrice 2016, İzmit 1999, Kahramanmaraş 2023, Port-au-Prince 2010, Gorkha 2015, Mexico 1985, Puebla 2017.
-
-Magnitude et PGA sont affichés pour chacun. Tōhoku (2,7 g) est volontairement conservé comme pire cas.
-
-## Limites
-
-Outil d'aide à la décision et de pré-dimensionnement. Il ne remplace pas une étude par un bureau d'études structure ni la conformité aux règles parasismiques applicables.
-Les prix des accessoires (pendules, amortisseurs, béton, pneus) sont des estimations à adapter aux réalités locales ; les prix LRB proviennent d'un devis.
-La capacité d'absorption des pneus usagés est dispersée : un essai de compression sur un pneu est recommandé.
-
-## Historique
-
-| Version | Évolution |
+| Element | Description |
 |---|---|
-| 11 | LRB bilinéaire, TMD liquide et pendulaire, 3 DDL |
-| 12 | 4 DDL, Newton-Raphson, critères EN 15129 / EC8, interface bilingue |
-| 13 | Balayage automatique des appuis, verdicts piscine / big-bag |
-| 14 | Fondation sandwich, pendules à friction, amortisseurs, courbe prix / risque |
-| 15 | Système de référence, radier nervuré, butées en pneus, casse sans / avec pneus |
+| House | single storey 12 × 12 m, tied concrete blockwork, metal sheet roof on timber frame |
+| Lower raft | 30 cm reinforced concrete cast on the ground, widened to carry the stop wall |
+| Crawl space | 0.8 m, ventilated, bearings and dampers |
+| Bearings | friction pendulums (R 3 to 6 m, stroke 40 / 60 / 80 cm) or LRB D400 to D1000, alone or with sliders |
+| Dampers | viscous, 0 to 30 % damping, number set by the force |
+| Upper raft | ribbed: 6 RC beams 30 × 50 + beam-and-block floor 20+5 (≈ 80 t) |
+| End stops | perimeter RC wall + truck tyres laid flat |
 
-## Technique
+**Reference system**: 9 friction pendulums R = 4 m, stroke ±80 cm, 3 × 3 grid, 20 % dampers (30 % on soft soil), tyre end stops.
 
-HTML / CSS / JavaScript natif, fichier unique, sans dépendance externe. Interface français / anglais, thèmes clair et sombre.
+## Method
 
-## Licence
+- Newmark-β time integration (average acceleration) with exact Newton-Raphson per branch.
+- Bearings: bilinear hysteretic model with kinematic hardening (LRB, pendulums, sliders).
+- End stops: Hunt-Crossley non-linear contact.
+- Earthquakes: artificial accelerograms compatible with the Eurocode 8 type 1 spectrum of each soil, scaled to the recorded PGA.
+- Torsion: 5 % accidental eccentricity (EC8), checked at the corner bearing.
+- Damage: walls (shear and out-of-plane), contents (HAZUS-type acceleration thresholds), failure if the end stops are crushed.
+- Risk: mean damage over the 21 earthquakes, as a % of the house value.
 
-[CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/deed.fr) — Attribution, pas d'utilisation commerciale.
+## Reference earthquakes
 
-- Utilisation, copie et modification libres à des fins **non commerciales**, avec **mention de l'auteur** (Eric PERRET).
-- Toute **utilisation commerciale est interdite sans accord écrit** de l'auteur.
+Kobe 1995, Tōhoku 2011, Niigata 2004, Kumamoto 2016, Northridge 1994, Loma Prieta 1989, San Fernando 1971, Alaska 1964, Christchurch 2011, Kaikōura 2016, Chi-Chi 1999, Maule 2010, Valdivia 1960, L'Aquila 2009, Amatrice 2016, İzmit 1999, Kahramanmaraş 2023, Port-au-Prince 2010, Gorkha 2015, Mexico City 1985, Puebla 2017.
 
-Voir le fichier [LICENSE](LICENSE).
+Magnitude and PGA are shown for each. Tōhoku (2.7 g) is deliberately kept as the worst case.
+
+## Limitations
+
+Decision-support and preliminary design tool. It does not replace a study by a structural engineering office nor compliance with the applicable seismic regulations.
+Accessory prices (pendulums, dampers, concrete, tyres) are estimates to be adapted to local conditions; LRB prices come from a quote.
+The absorption capacity of used tyres is scattered: a compression test on one tyre is recommended.
+
+## History
+
+| Version | Change |
+|---|---|
+| 11 | Bilinear LRB, liquid and pendulum TMD, 3 DOF |
+| 12 | 4 DOF, Newton-Raphson, EN 15129 / EC8 criteria, bilingual interface |
+| 13 | Automatic bearing sweep, swimming-pool / big-bag verdicts |
+| 14 | Sandwich foundation, friction pendulums, dampers, price / risk curve |
+| 15 | Reference system, ribbed raft, tyre end stops, damage without / with tyres |
+| 15.2 | Browser language detected on load |
+
+The detail of each version is in the header block of `simulateur_sismique.html`.
+
+## Technology
+
+Native HTML / CSS / JavaScript, single file, no external dependency. Parallel computation on 4 Web Workers.
+
+## License
+
+[CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) — Attribution, NonCommercial.
+
+- Free use, copy and modification for **non-commercial** purposes, with **credit to the author** (Eric PERRET).
+- Any **commercial use is forbidden without written consent** from the author.
+
+See the [LICENSE](LICENSE) file.

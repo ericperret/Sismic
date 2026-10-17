@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <!--
 ==============================================================================
- Nom          : simulateur_sismique_v15.html
+ Nom          : simulateur_sismique.html
  Objet        : Aide au choix de l'isolation sismique d'une maison de plain-pied
                 12 × 12 m sur fondation sandwich : courbe prix / risque par
                 type de terrain, pour 21 séismes de référence
  Auteur       : Eric PERRET — assistance Claude (Anthropic)
- Date         : 2026-10-08
- Version      : 15.1
+ Date         : 2026-10-17
+ Version      : 15.2
  Dépendances  : aucune (HTML/CSS/JavaScript natif, fichier autonome)
  Licence      : CC BY-NC 4.0 — usage commercial interdit sans accord écrit de l'auteur
 ------------------------------------------------------------------------------
@@ -36,6 +36,8 @@
                 de choc ; casse 100 % seulement si les butées sont écrasées
    15.1  : rôle des pneus rendu visible : casse sans pneus / avec pneus,
            énergie absorbée et part de la capacité des pneus par séisme
+   15.2  : langue détectée au chargement (français si le navigateur est en
+           français, anglais sinon), bouton FR / EN conservé
 ==============================================================================
 -->
 <html lang="fr">
@@ -142,7 +144,7 @@ footer { text-align: center; color: var(--muted); font-size: .7rem; padding: 8px
 <body>
 <header>
     <div>
-        <h1><span data-i18n="titre">Isolation sismique : prix contre risque</span><span class="badge">v15.1</span></h1>
+        <h1><span data-i18n="titre">Isolation sismique : prix contre risque</span><span class="badge">v15.2</span></h1>
         <div class="sub" data-i18n="soustitre">Maison plain-pied 12 × 12 m · fondation sandwich · 4 classes de sol · 21 séismes</div>
     </div>
     <div class="hdr-btns">
@@ -829,7 +831,7 @@ var SIM = (function () {
         }
     };
 
-    var LANG = 'fr', SOLS = ['A', 'B', 'C', 'D'], RES = {}, ACTIF = 'C', SEL = {}, QSEL = null, DETAIL = null, OCCUPE = false, T0 = 0, DUREE = null;
+    var LANG = /^fr(-|$)/i.test((navigator.languages && navigator.languages[0]) || navigator.language || '') ? 'fr' : 'en', SOLS = ['A', 'B', 'C', 'D'], RES = {}, ACTIF = 'C', SEL = {}, QSEL = null, DETAIL = null, OCCUPE = false, T0 = 0, DUREE = null;
     var G = SIM.G, Q = SIM.SEISMES, H = SIM.HYP, PRIX = {}, k;
     for (k in H.prix) { if (H.prix.hasOwnProperty(k)) { PRIX[k] = H.prix[k]; } }
     var POINTS = [];
