@@ -13,10 +13,12 @@
 
 ▶️ **[Launch the simulator](https://ericperret.github.io/Sismic/simulateur_sismique.html)** — the computation starts by itself on load.
 
-![Seismic isolation simulator v15.2](screenshot_en.png)
+![Selected configuration: installation plan of pendulums, dampers and stops, sandwich section, damage per earthquake](screenshot_plan_en.png)
 
 A standalone tool (one single HTML file) to help choose the seismic isolation of a 12 × 12 m single-storey house.
-It compares hundreds of bearing configurations against 21 reference earthquakes and 4 soil classes, and plots the **price / risk curve** to support the choice.
+It compares hundreds of bearing configurations against 21 reference earthquakes and 4 soil classes, plots the **price / risk curve** and, above all, gives for the chosen configuration the **installation plan of the devices**: position of the friction pendulums or LRBs, dampers, end stops and tyres, with the sandwich section and the gap to keep.
+
+![Overview: prices, summary by soil](screenshot_en.png)
 
 ## Usage
 
@@ -32,7 +34,7 @@ Prices can be edited in the header: the curve updates instantly, without re-runn
 |---|---|
 | Summary by soil | Rock, stiff soil, medium soil, soft soil: no isolation, reference system, small budget, best value, minimum damage |
 | Price / risk scatter | Each point is a configuration; the line joins the best trade-offs; clicking a point shows its details |
-| Selected configuration | Detailed cost, section and plan of the sandwich foundation, bearings, dampers, end stops |
+| **Installation plan** | For the selected configuration: dimensioned plan of the bearings (pendulums or LRBs), dampers, stop wall and tyres, centre of mass; sandwich section with the gap before the stops; detailed cost |
 | Damage per earthquake | No isolation, without tyres, with tyres, energy absorbed by the end stops |
 | Earthquake time history | House acceleration (envelopes and damage thresholds), bearing displacement (gap, stroke), cause of damage |
 | Editable prices | Accessories, concrete, tyres, house value: curve recomputed without re-running the simulation |

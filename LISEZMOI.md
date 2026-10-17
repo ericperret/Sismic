@@ -13,10 +13,12 @@
 
 ▶️ **[Lancer le simulateur](https://ericperret.github.io/Sismic/simulateur_sismique.html)** — le calcul démarre seul au chargement.
 
-![Simulateur d'isolation sismique v15.2](screenshot_fr.png)
+![Configuration retenue : plan de pose des pendules, amortisseurs et butées, coupe du sandwich, casse par séisme](screenshot_plan_fr.png)
 
 Outil autonome (un seul fichier HTML) d'aide au choix de l'isolation sismique d'une maison de plain-pied de 12 × 12 m.
-Il compare des centaines de configurations d'appuis sur 21 séismes de référence et 4 classes de sol, et trace la **courbe prix / risque** pour aider à choisir.
+Il compare des centaines de configurations d'appuis sur 21 séismes de référence et 4 classes de sol, trace la **courbe prix / risque** et donne surtout, pour la configuration choisie, le **plan de pose des dispositifs** : position des pendules à friction ou des LRB, des amortisseurs, des butées et des pneus, avec la coupe du sandwich et le jeu à respecter.
+
+![Vue d'ensemble : prix, synthèse par terrain](screenshot_fr.png)
 
 ## Utilisation
 
@@ -32,7 +34,7 @@ Les prix sont modifiables dans l'en-tête : la courbe se met à jour instantané
 |---|---|
 | Synthèse par terrain | Rocher, sol ferme, sol moyen, sol mou : sans isolation, système de référence, petit budget, meilleur rapport, casse minimale |
 | Nuage prix / risque | Chaque point est une configuration ; la ligne relie les meilleurs compromis ; un clic sur un point affiche le détail |
-| Configuration sélectionnée | Coût détaillé, coupe et plan du sandwich, appuis, amortisseurs, butées |
+| **Plan de pose** | Pour la configuration sélectionnée : plan coté des appuis (pendules ou LRB), des amortisseurs, du muret de butée et des pneus, centre des masses ; coupe du sandwich avec le jeu avant butée ; coût détaillé |
 | Casse par séisme | Sans isolation, sans pneus, avec pneus, énergie absorbée par les butées |
 | Historique d'un séisme | Accélération de la maison (enveloppes et seuils de casse), déplacement des appuis (jeu, course), cause de la casse |
 | Prix modifiables | Accessoires, béton, pneus, valeur de la maison : courbe recalculée sans relancer la simulation |
