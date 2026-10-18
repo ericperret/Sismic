@@ -7,7 +7,7 @@
                 type de terrain, pour 21 séismes de référence
  Auteur       : Eric PERRET — assistance Claude (Anthropic)
  Date         : 2026-10-17
- Version      : 15.2
+ Version      : 15.3
  Dépendances  : aucune (HTML/CSS/JavaScript natif, fichier autonome)
  Licence      : CC BY-NC 4.0 — usage commercial interdit sans accord écrit de l'auteur
 ------------------------------------------------------------------------------
@@ -38,6 +38,9 @@
            énergie absorbée et part de la capacité des pneus par séisme
    15.2  : langue détectée au chargement (français si le navigateur est en
            français, anglais sinon), bouton FR / EN conservé
+   15.3  : charte graphique AZS (palette, typographie, en-tête avec lien de
+           retour vers www.azs.fr, boutons et onglets ambre, tracés cyan) ;
+           version corrigée dans le pied de page
 ==============================================================================
 -->
 <html lang="fr">
@@ -46,44 +49,62 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Isolation sismique v15</title>
 <style>
+/* ---------- charte AZS (www.azs.fr) ---------- */
 :root {
-    --bg: #0d1117; --panel: #161b22; --panel2: #1c2128; --border: #30363d;
-    --text: #c9d1d9; --muted: #8b949e; --accent: #58a6ff; --accent2: #79c0ff;
-    --ok: #3fb950; --warn: #d29922; --bad: #f85149; --orange: #f0883e; --violet: #bc8cff; --grid: #21262d;
+    --bg: #0e1418; --panel: #18222a; --panel2: #141c22; --border: #26343e;
+    --text: #dfe7ec; --muted: #8fa1ad; --accent: #5cc8d6; --accent2: #8fdde6;
+    --ambre: #f0a63a; --ambre2: #ffcf7a; --sur-ambre: #111;
+    --ok: #3fb950; --warn: #d29922; --bad: #f85149; --orange: #f0883e; --violet: #bc8cff; --grid: #1f2b34;
     --h0: #0f3e1a; --h1: #24451c; --h2: #4a4215; --h3: #5e2f14; --h4: #6b1d1d;
-    --mono: ui-monospace, "SFMono-Regular", Consolas, "Courier New", monospace;
-    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --ombre: 0 1px 0 rgba(255,255,255,.03) inset, 0 10px 30px -18px rgba(0,0,0,.8);
+    --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     color-scheme: dark;
 }
 @media (prefers-color-scheme: light) {
     :root:not([data-theme="dark"]) {
-        --bg: #ffffff; --panel: #f6f8fa; --panel2: #eef1f4; --border: #d0d7de;
-        --text: #1f2328; --muted: #59636e; --accent: #0969da; --accent2: #0550ae;
-        --ok: #1a7f37; --warn: #9a6700; --bad: #cf222e; --orange: #bc4c00; --violet: #8250df; --grid: #e6e9ed;
-        --h0: #c8f0d0; --h1: #e6f2c2; --h2: #fbe9a8; --h3: #fcc9a2; --h4: #f9a9a6; color-scheme: light;
+        --bg: #f4f1ea; --panel: #fffdf8; --panel2: #ebe6db; --border: #d8d0c0;
+        --text: #1c2428; --muted: #5f6b72; --accent: #1f7f8c; --accent2: #165f69;
+        --ambre: #b86a00; --ambre2: #8a4f00; --sur-ambre: #fff;
+        --ok: #1a7f37; --warn: #9a6700; --bad: #cf222e; --orange: #bc4c00; --violet: #8250df; --grid: #e4ddcf;
+        --h0: #c8f0d0; --h1: #e6f2c2; --h2: #fbe9a8; --h3: #fcc9a2; --h4: #f9a9a6;
+        --ombre: 0 1px 2px rgba(60,40,0,.06), 0 12px 28px -20px rgba(60,40,0,.35); color-scheme: light;
     }
 }
 :root[data-theme="light"] {
-    --bg: #ffffff; --panel: #f6f8fa; --panel2: #eef1f4; --border: #d0d7de;
-    --text: #1f2328; --muted: #59636e; --accent: #0969da; --accent2: #0550ae;
-    --ok: #1a7f37; --warn: #9a6700; --bad: #cf222e; --orange: #bc4c00; --violet: #8250df; --grid: #e6e9ed;
-    --h0: #c8f0d0; --h1: #e6f2c2; --h2: #fbe9a8; --h3: #fcc9a2; --h4: #f9a9a6; color-scheme: light;
+        --bg: #f4f1ea; --panel: #fffdf8; --panel2: #ebe6db; --border: #d8d0c0;
+        --text: #1c2428; --muted: #5f6b72; --accent: #1f7f8c; --accent2: #165f69;
+        --ambre: #b86a00; --ambre2: #8a4f00; --sur-ambre: #fff;
+        --ok: #1a7f37; --warn: #9a6700; --bad: #cf222e; --orange: #bc4c00; --violet: #8250df; --grid: #e4ddcf;
+        --h0: #c8f0d0; --h1: #e6f2c2; --h2: #fbe9a8; --h3: #fcc9a2; --h4: #f9a9a6;
+        --ombre: 0 1px 2px rgba(60,40,0,.06), 0 12px 28px -20px rgba(60,40,0,.35); color-scheme: light;
 }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 var(--sans); }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 var(--sans);
+       background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px);
+       background-size: 48px 48px; background-attachment: fixed; background-position: -1px -1px; }
+body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+       background: radial-gradient(ellipse at 50% 0%, transparent 0%, var(--bg) 70%); }
 header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px;
-         background: var(--panel); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
-header h1 { margin: 0; font-size: 1.1rem; color: var(--accent); }
-.badge { display: inline-block; background: var(--orange); color: #000; padding: 1px 8px; border-radius: 10px; font-size: .7rem; font-weight: 700; vertical-align: middle; margin-left: 6px; }
+         background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+         border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+.hdr-g { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.azs { font: 800 26px/1 var(--mono); letter-spacing: -1px; color: var(--ambre); text-decoration: none;
+       padding-right: 16px; border-right: 1px solid var(--border); }
+.azs:hover { color: var(--ambre2); }
+header h1 { margin: 0; font: 700 1.1rem/1.25 var(--sans); color: var(--text); letter-spacing: -.2px; }
+.badge { display: inline-block; background: transparent; color: var(--ambre); border: 1px solid var(--ambre); padding: 0 7px; border-radius: 999px; font: 600 .7rem var(--mono); vertical-align: middle; margin-left: 6px; }
 .sub { color: var(--muted); font-size: .78rem; }
 .hdr-btns { display: flex; gap: 6px; }
 main { max-width: 1500px; margin: 0 auto; padding: 16px; }
-.card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 14px; padding: 12px 14px; }
-.card h2 { margin: 0 0 8px; font-size: 1rem; color: var(--accent2); }
-.card h3 { margin: 0 0 6px; font-size: .85rem; color: var(--accent2); }
-details.card > summary { cursor: pointer; font-weight: 600; color: var(--accent2); list-style: none; display: flex; gap: 8px; align-items: center; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 14px; padding: 14px 16px; box-shadow: var(--ombre); }
+.card h2 { margin: 0 0 10px; font: 700 1rem/1.3 var(--sans); color: var(--text); display: flex; align-items: center; gap: 8px; }
+.card h2::before { content: ""; width: 3px; height: 1em; border-radius: 2px; background: var(--ambre); flex: none; }
+.card h3 { margin: 0 0 6px; font: 600 .88rem/1.3 var(--sans); color: var(--text); }
+details.card > summary { cursor: pointer; font-weight: 700; color: var(--text); list-style: none; display: flex; gap: 8px; align-items: center; }
 details.card > summary::-webkit-details-marker { display: none; }
-details.card > summary::after { content: "▸"; margin-left: auto; color: var(--muted); transition: transform .2s; }
+details.card > summary:hover { color: var(--ambre); }
+details.card > summary::after { content: "▸"; margin-left: auto; color: var(--ambre); transition: transform .2s; }
 details.card[open] > summary::after { transform: rotate(90deg); }
 .hyp { display: grid; grid-template-columns: minmax(150px, max-content) 1fr; gap: 4px 16px; margin-top: 10px; font-size: .8rem; }
 .hyp dt { color: var(--muted); font-weight: 600; }
@@ -91,16 +112,17 @@ details.card[open] > summary::after { transform: rotate(90deg); }
 .prix { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px 12px; margin-top: 10px; }
 .prix label { display: block; font-size: .72rem; color: var(--muted); font-weight: 600; margin-bottom: 3px; }
 .prix input { width: 100%; padding: 5px 8px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; font: 13px var(--mono); }
-.prix input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.prix input:focus { outline: 2px solid var(--ambre); outline-offset: -1px; }
 .devis { font-size: .74rem; color: var(--muted); margin-top: 8px; font-family: var(--mono); }
 .run { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .prog { flex: 1; min-width: 200px; height: 10px; background: var(--panel2); border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
-.prog > div { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--orange)); transition: width .2s; }
+.prog > div { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--ambre)); transition: width .2s; }
 .status { font-size: .8rem; color: var(--muted); min-width: 220px; }
-button { padding: 8px 16px; border: 0; border-radius: 6px; font: 700 .78rem var(--sans); cursor: pointer; color: #fff; background: #238636; text-transform: uppercase; letter-spacing: .03em; }
-button:hover { filter: brightness(1.15); }
+button { padding: 9px 18px; border: 0; border-radius: 6px; font: 700 .82rem var(--sans); cursor: pointer; color: var(--sur-ambre); background: var(--ambre); transition: filter .15s, border-color .15s, color .15s; }
+button:hover { filter: brightness(1.1); }
 button:disabled { opacity: .45; cursor: progress; }
-.b-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); text-transform: none; padding: 5px 10px; }
+.b-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); padding: 7px 12px; font: 600 12px/1 var(--mono); letter-spacing: 1px; white-space: nowrap; }
+.b-ghost:hover { filter: none; color: var(--text); border-color: var(--ambre); }
 .tablewrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: .8rem; }
 th, td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: middle; }
@@ -112,13 +134,14 @@ tr.sel td { outline: 1px solid var(--accent); outline-offset: -1px; }
 .rep b { display: block; font-size: .8rem; }
 .rep span { font-family: var(--mono); font-size: .76rem; color: var(--muted); }
 .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
-.tab { background: var(--panel); color: var(--text); border: 1px solid var(--border); text-transform: none; font-weight: 600; }
-.tab.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.tab { background: var(--panel); color: var(--muted); border: 1px solid var(--border); font-weight: 600; border-radius: 999px; padding: 7px 14px; }
+.tab:hover { filter: none; color: var(--text); border-color: var(--ambre); }
+.tab.on { background: var(--ambre); color: var(--sur-ambre); border-color: var(--ambre); }
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin: 10px 0; }
 .tile { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; text-align: center; }
 .tile b { display: block; font: 600 1.2rem var(--mono); color: var(--accent); }
 .tile span { display: block; font-size: .72rem; color: var(--muted); }
-.tile.hl { border-color: var(--orange); } .tile.hl b { color: var(--orange); }
+.tile.hl { border-color: var(--ambre); } .tile.hl b { color: var(--ambre); }
 .titre-sel { font-size: 1.02rem; font-weight: 700; margin: 2px 0; }
 .ventil { font-size: .78rem; color: var(--muted); font-family: var(--mono); }
 .duo { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 14px; }
@@ -138,14 +161,19 @@ tr.sel td { outline: 1px solid var(--accent); outline-offset: -1px; }
 .charts canvas { display: block; width: 100%; height: 220px; }
 .note { font-size: .78rem; color: var(--muted); padding: 6px 10px; border-left: 3px solid var(--accent); background: var(--panel2); border-radius: 4px; margin: 8px 0; }
 .vide { color: var(--muted); text-align: center; padding: 30px; }
-footer { text-align: center; color: var(--muted); font-size: .7rem; padding: 8px 0 18px; }
+footer { text-align: center; color: var(--muted); font: .7rem/1.6 var(--mono); padding: 8px 16px 22px; }
+footer a { color: var(--muted); } footer a:hover { color: var(--ambre); }
+@media (max-width: 640px) { .azs { font-size: 20px; padding-right: 10px; } .hdr-g { gap: 10px; } .sub { display: none; } }
 </style>
 </head>
 <body>
 <header>
-    <div>
-        <h1><span data-i18n="titre">Isolation sismique : prix contre risque</span><span class="badge">v15.2</span></h1>
+    <div class="hdr-g">
+        <a class="azs" href="https://www.azs.fr/" title="www.azs.fr">AZS</a>
+        <div>
+        <h1><span data-i18n="titre">Isolation sismique : prix contre risque</span><span class="badge">v15.3</span></h1>
         <div class="sub" data-i18n="soustitre">Maison plain-pied 12 × 12 m · fondation sandwich · 4 classes de sol · 21 séismes</div>
+        </div>
     </div>
     <div class="hdr-btns">
         <button class="b-ghost" id="btnTheme" type="button">☀ / ☾</button>
@@ -180,7 +208,7 @@ footer { text-align: center; color: var(--muted); font-size: .7rem; padding: 8px
     <div id="panneauSol"></div>
 </main>
 
-<footer data-i18n="pied">v15.1 · Newmark-β + Newton-Raphson · LRB / glissants / pendules à friction / amortisseurs visqueux · spectre EC8 type 1 · torsion accidentelle EC8</footer>
+<footer><span data-i18n="pied">v15.3 · Newmark-β + Newton-Raphson · LRB / glissants / pendules à friction / amortisseurs visqueux · spectre EC8 type 1 · torsion accidentelle EC8</span><br><a href="https://www.azs.fr/">www.azs.fr</a> · <a href="https://github.com/ericperret/Sismic">github.com/ericperret/Sismic</a></footer>
 
 <script id="noyau">
 var SIM = (function () {
@@ -716,7 +744,7 @@ var SIM = (function () {
             soustitre: 'Maison plain-pied 12 × 12 m · fondation sandwich · 4 classes de sol · 21 séismes',
             sec_hyp: 'Modèle de construction et hypothèses', sec_prix: 'Prix (modifiables, recalcul instantané)',
             b_run: 'Relancer le calcul', sec_synth: 'Synthèse par type de terrain',
-            pied: 'v15.1 · Newmark-β + Newton-Raphson · LRB / glissants / pendules à friction / amortisseurs visqueux · spectre EC8 type 1 · torsion accidentelle EC8',
+            pied: 'v15.3 · Newmark-β + Newton-Raphson · LRB / glissants / pendules à friction / amortisseurs visqueux · spectre EC8 type 1 · torsion accidentelle EC8',
             sol_A: 'A – Rocher', sol_B: 'B – Sol ferme', sol_C: 'C – Sol moyen', sol_D: 'D – Sol mou',
             st_calc: 'Calcul en cours — {p} %', st_fini: 'Terminé en {s} s', st_err: 'Erreur : ', st_attente: 'Calcul en attente',
             h_maison: 'Maison', v_maison: 'plain-pied 12 × 12 m, parpaing chaîné 20 cm, tôle sur charpente, hauteur 2,8 m',
@@ -775,7 +803,7 @@ var SIM = (function () {
             soustitre: 'Single-storey 12 × 12 m house · sandwich foundation · 4 soil classes · 21 earthquakes',
             sec_hyp: 'Construction model and assumptions', sec_prix: 'Prices (editable, instant update)',
             b_run: 'Re-run calculation', sec_synth: 'Summary by soil type',
-            pied: 'v15.1 · Newmark-β + Newton-Raphson · LRB / sliders / friction pendulums / viscous dampers · EC8 type 1 spectrum · EC8 accidental torsion',
+            pied: 'v15.3 · Newmark-β + Newton-Raphson · LRB / sliders / friction pendulums / viscous dampers · EC8 type 1 spectrum · EC8 accidental torsion',
             sol_A: 'A – Rock', sol_B: 'B – Stiff soil', sol_C: 'C – Medium soil', sol_D: 'D – Soft soil',
             st_calc: 'Computing — {p} %', st_fini: 'Done in {s} s', st_err: 'Error: ', st_attente: 'Waiting',
             h_maison: 'House', v_maison: 'single storey 12 × 12 m, 20 cm confined blockwork, metal sheet on timber roof, height 2.8 m',

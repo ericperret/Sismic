@@ -3,7 +3,7 @@
   Objet    : Présentation du simulateur d'isolation sismique (dépôt GitHub)
   Auteur   : Eric PERRET — assistance Claude (Anthropic)
   Date     : 2026-10-17
-  Version  : 15.2
+  Version  : 15.3
   Licence  : CC BY-NC 4.0 — usage commercial interdit sans accord écrit de l'auteur
 -->
 
@@ -86,6 +86,7 @@ La capacité d'absorption des pneus usagés est dispersée : un essai de compres
 | 14 | Fondation sandwich, pendules à friction, amortisseurs, courbe prix / risque |
 | 15 | Système de référence, radier nervuré, butées en pneus, casse sans / avec pneus |
 | 15.2 | Langue du navigateur détectée au chargement |
+| 15.3 | Charte graphique AZS (palette, en-tête avec lien de retour vers www.azs.fr), captures refaites |
 
 Le détail de chaque version figure dans le cartouche en tête de `simulateur_sismique.html`.
 

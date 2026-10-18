@@ -3,7 +3,7 @@
   Purpose  : Overview of the seismic isolation simulator (GitHub repository)
   Author   : Eric PERRET — assisted by Claude (Anthropic)
   Date     : 2026-10-17
-  Version  : 15.2
+  Version  : 15.3
   License  : CC BY-NC 4.0 — commercial use forbidden without the author's written consent
 -->
 
@@ -86,6 +86,7 @@ The absorption capacity of used tyres is scattered: a compression test on one ty
 | 14 | Sandwich foundation, friction pendulums, dampers, price / risk curve |
 | 15 | Reference system, ribbed raft, tyre end stops, damage without / with tyres |
 | 15.2 | Browser language detected on load |
+| 15.3 | AZS visual identity (palette, header with link back to www.azs.fr), screenshots refreshed |
 
 The detail of each version is in the header block of `simulateur_sismique.html`.
 
